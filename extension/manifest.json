@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "MalOffice Uploader",
+  "version": "0.1.0",
+  "permissions": [],
+  "host_permissions": [
+    "https://knowmal.duckdns.org/*",
+    "https://*.tistory.com/*",
+    "https://blog.kakaocdn.net/*"
+  ],
+  "action": { "default_popup": "popup.html" },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.tistory.com/*","https://*.tistory.io/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ]
+}

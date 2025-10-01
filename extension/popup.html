@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>문서 위협 리포트 · 업로드</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>KnowMal</h1>
+        <div class="sub">정적 분석 기반 피처 → AI 예측 · 보고서 링크 생성</div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>파일 선택</h2>
+      <div id="drop" class="drop" tabindex="0" aria-label="파일 드래그 앤 드롭 영역">
+        파일을 이곳에 드롭하거나,<br> 아래 버튼으로 선택하세요.
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <input type="file" id="fileInput" />
+      </div>
+
+      <div class="actions">
+        <button id="btnUpload" class="btn-primary" disabled>서버로 전송</button>
+        <button id="btnReport" class="btn-secondary" disabled>리포트 확인</button>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <span id="statusPill" class="pill">
+          <span class="dot" style="background:#9ca3af"></span>대기
+        </span>
+        <div class="meter" style="flex:1;min-width:140px;">
+          <span id="prog" class="fill"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>문서 위협 리포트 – AI 네트워크 행위 예측</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>문서 위협 리포트 – AI 네트워크 행위 예측</h1>
+        <div class="sub">정적 분석 기반 문서 피처 → AI로 네트워크 행위(Download / C2 / Exfil 등) 예측 · XAI 근거 제공</div>
+      </div>
+    </header>
+
+    <section class="summary card" aria-labelledby="section-summary">
+      <h2 id="section-summary" class="sr-only" style="position:absolute;left:-9999px">요약</h2>
+      <div>
+        <h2>요약</h2>
+
+        <div style="margin:8px 0 12px">
+          <span id="riskStage" class="riskStage">Malicious</span>
+        </div>
+
+        <p id="nlgSummary" style="margin:2px 0 10px;font-size:13px;color:var(--muted)">
+          다수의 외부 링크와 자동실행 트리거를 결합해 파일 다운로드 및 원격 C2 통신을 유도하는 공격 패턴.
+        </p>
+
+        <div class="row" style="margin-top:6px">
+          <span class="badge"><span class="dot" style="background:#ff5d5d"></span> 매크로 있음</span>
+          <span class="badge"><span class="dot" style="background:#f6c26b"></span> 외부 링크 5</span>
+          <span class="badge"><span class="dot" style="background:#66d27a"></span> 편집 보호</span>
+          <span class="badge"><span class="dot" style="background:#22d3ee"></span> 단축 URL 포함</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="kpi" aria-label="스캔 메타데이터">
+          <div class="k"><div class="t">파일명</div><div class="v" id="fileName">resume_2025.docx</div></div>
+          <div class="k"><div class="t">SHA-256</div><div class="v mono" id="fileHash">b3a88c...9f2c</div></div>
+          <div class="k"><div class="t">크기</div><div class="v" id="fileSize">1.2 MB</div></div>
+          <div class="k"><div class="t">분석 일시</div><div class="v" id="analyzedAt">2025-09-10 04:25 KST</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="section-behaviors">
+      <h2 id="section-behaviors">예측된 네트워크 행위</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:170px">행위 클래스</th>
+            <th>설명</th>
+            <th style="width:160px">신뢰도 (3단계)</th>
+          </tr>
+        </thead>
+        <tbody id="behTbody"></tbody>
+      </table>
+
+    </section>
+
+    <section class="grid cols-2">
+      <div class="card" aria-labelledby="section-artifacts">
+        <h2 id="section-artifacts">증거 (Artifacts)</h2>
+        <div class="chips" id="artifactChips"></div>
+        <div class="divider"></div>
+        <div class="kv">
+          <div class="key">포맷</div><div id="fmt">DOCX (ZIP/XML)</div>
+          <div class="key">매크로</div><div id="macro">존재</div>
+          <div class="key">임베디드 개체</div><div id="embed">2개</div>
+          <div class="key">난독화 지표</div><div id="obf">고엔트로피 3, Base64 2</div>
+        </div>
+      </div>
+
+      <div class="card" aria-labelledby="section-xai">
+        <h2 id="section-xai">XAI (설명가능한 인공지능)</h2>
+        <div id="xaiGlobal"></div>
+        <div class="divider"></div>
+        <div class="callout">
+          <div class="muted" style="margin-bottom:6px">반사실(Counterfactual)</div>
+          <div id="counterfactual">외부 URL ≤ 1 & 자동실행 트리거 제거 → 위험 단계 Malicious → Suspicious로 완화 예상</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="section-nlg">
+      <h2 id="section-nlg">자연어 설명 & 권고 (AI)</h2>
+      <p id="nlgDetail">
+        본 문서는 <b>외부 URL 다중 삽입</b>과 <b>자동실행 트리거(AutoOpen/OpenAction)</b>를 통해 
+        사용자가 ‘콘텐츠 사용’을 허용할 경우 <b>악성 파일 다운로드</b> 및 
+        <b>원격 서버(C2)와의 주기적 통신</b>을 유발할 가능성이 높습니다. 
+        난독화된 문자열(Base64 추정)과 단축 URL이 함께 발견되어 
+        네트워크 차단 회피 및 탐지 우회를 시도한 흔적도 관찰됩니다. 
+        따라서 위험도는 <b>Malicious</b>로 평가되며, 초기 차단이 필요합니다.
+      </p>
+
+      <ul>
+        <li>원본 문서 격리 및 외부 공유 금지</li>
+        <li>관련 도메인/URL 임시 차단 및 DNS 로그 확인</li>
+        <li>발신자/전달 경로 및 DKIM/DMARC 검증</li>
+      </ul>
+    </section>
+
+    <footer>
+      Report ID: scan-uuid-1234 · Node: worker-seoul-01 · Processing: 480ms
+    </footer>
+  </div>
+
+  <script>
+
+  const data = {
+    summary: { risk_score: 8.2, label: 'malicious' }, 
+    nlg_summary: '외부 링크와 자동실행 트리거로 네트워크 다운로드를 유도하는 패턴.',
+    behaviors: [
+      { name:'URL 다운로드 시도', desc:'문서 열람→외부 바이너리/스크립트 다운로드 유도', p:0.82, ci:[0.76,0.88] },
+      { name:'C2/비콘 통신 유도', desc:'타이머/자동실행으로 주기적 호출 유도', p:0.61, ci:[0.52,0.70] },
+    ],
+    artifacts: [
+      'hxxp://cdn[.]examp1e[.]site/update.bin',
+      'hxxps://bit[.]ly/abCDe',
+      'AutoOpen / OpenAction',
+      '편집 보호(Protect)'
+    ],
+    xai_global: [
+      { k:'외부 URL 개수', v:0.31 },
+      { k:'자동실행 트리거', v:0.21 },
+      { k:'난독화 문자열 엔트로피', v:0.14 },
+      { k:'단축 URL 존재', v:0.10 },
+      { k:'의심 키워드 스코어', v:0.09 },
+      { k:'임베디드 개체 수', v:0.07 },
+      { k:'양식/버튼 스크립트 연결', v:0.05 },
+      { k:'화이트리스트 도메인', v:0.03 }
+    ],
+    meta: {
+      fileName: 'resume_2025.docx',
+      fileHash: 'b3a88c...9f2c',
+      fileSize: '1.2 MB',
+      analyzedAt: '2025-09-10 04:25 KST',
+      fmt: 'DOCX (ZIP/XML)',
+      macro: '존재',
+      embed: '2개',
+      obf: '고엔트로피 3, Base64 2'
+    }
+  };
+
+  const toStage = (risk) => {
+    if (risk >= 7) return {txt:'Malicious', cls:'risk-malicious'};
+    if (risk >= 4) return {txt:'Suspicious', cls:'risk-suspicious'};
+    return {txt:'Safe', cls:'risk-safe'};
+  };
+
+  const toConfidence = (p, ci) => {
+
+    if (p >= 0.7 || (ci && ci[0] >= 0.6)) return {txt:'HIGH', cls:'conf-high'};
+    if (p >= 0.4) return {txt:'MEDIUM', cls:'conf-mid'};
+    return {txt:'LOW', cls:'conf-low'};
+  };
+
+  const st = toStage(data.summary.risk_score);
+  const rs = document.getElementById('riskStage');
+  rs.textContent = st.txt;
+  rs.className = `riskStage ${st.cls}`;
+
+  document.getElementById('nlgSummary').textContent = data.nlg_summary || '';
+
+  document.getElementById('fileName').textContent  = data.meta.fileName;
+  document.getElementById('fileHash').textContent  = data.meta.fileHash;
+  document.getElementById('fileSize').textContent  = data.meta.fileSize;
+  document.getElementById('analyzedAt').textContent= data.meta.analyzedAt;
+
+  const tb = document.getElementById('behTbody');
+  data.behaviors.forEach(b => {
+    const conf = toConfidence(b.p, b.ci);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${b.name}</strong></td>
+      <td class="muted">${b.desc}</td>
+      <td><span class="conf ${conf.cls}">${conf.txt}</span></td>
+    `;
+    tb.appendChild(tr);
+  });
+
+  const chips = document.getElementById('artifactChips');
+  data.artifacts.forEach(t => {
+    const s = document.createElement('span');
+    s.className = 'chip';
+    s.textContent = t;
+    chips.appendChild(s);
+  });
+
+  const xg = document.getElementById('xaiGlobal');
+  data.xai_global.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'feat';
+    row.innerHTML = `
+      <div>${f.k}</div>
+      <div class="bar"><span class="w" style="width:${Math.round(f.v*100)}%"></span></div>
+    `;
+    xg.appendChild(row);
+  });
+
+  document.getElementById('fmt').textContent   = data.meta.fmt;
+  document.getElementById('macro').textContent = data.meta.macro;
+  document.getElementById('embed').textContent = data.meta.embed;
+  document.getElementById('obf').textContent   = data.meta.obf;
+
+  </script>
+</body>
+</html>
