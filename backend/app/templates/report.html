@@ -20,8 +20,288 @@
     <h2>File</h2>
     <div class="meta">filename: <strong>{{ data.filename }}</strong> &nbsp;•&nbsp;
       mime: {{ data.mime_type or "-" }} &nbsp;•&nbsp; size: {{ data.size_bytes }}B
+      {% if data.sha256 %}&nbsp;•&nbsp; SHA256: {{ data.sha256[:16] }}...{% endif %}
     </div>
   </div>
+
+  {% if data.analysis_report %}
+  <div class="card">
+    <h2>정적 분석 결과</h2>
+    <div class="analysis-section">
+      <h3>파일 구조</h3>
+      {% set structure = data.analysis_report.features.structure if data.analysis_report and data.analysis_report.features else {} %}
+      <div class="meta">
+        Format: <strong>{{ structure.format or "unknown" }}</strong> &nbsp;•&nbsp;
+        OLE Header Valid: {{ "✓" if structure.ole_header_valid else "✗" }} &nbsp;•&nbsp;
+        Streams: {{ structure.streams_count or 0 }} &nbsp;•&nbsp;
+        Storages: {{ structure.storages_count or 0 }}
+      </div>
+      {% if structure.metadata_anomalies %}
+      <div class="anomalies">
+        <strong>이상 징후:</strong>
+        {% for anomaly in structure.metadata_anomalies %}
+          <span class="badge warning">{{ anomaly }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% set macros = data.analysis_report.features.macros if data.analysis_report and data.analysis_report.features else {} %}
+    {% if macros.has_vba %}
+    <div class="analysis-section">
+      <h3>매크로 분석</h3>
+      <div class="meta">
+        VBA 매크로: <strong class="danger">발견됨</strong> &nbsp;•&nbsp;
+        모듈 수: {{ macros.modules|length or 0 }} &nbsp;•&nbsp;
+        의심스러운 API 호출: {{ macros.suspicious_api_calls_count or 0 }}
+      </div>
+      {% if macros.autoexec_triggers %}
+      <div class="autoexec">
+        <strong>자동 실행 트리거:</strong>
+        {% for trigger in macros.autoexec_triggers %}
+          <span class="badge danger">{{ trigger }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if macros.modules %}
+      <div class="modules">
+        <strong>VBA 모듈:</strong>
+        {% for module in macros.modules %}
+          <span class="module">{{ module.name }} ({{ module.line_count }}줄{% if module.obfuscated %}, 난독화{% endif %})</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% set strings = data.analysis_report.features.strings if data.analysis_report and data.analysis_report.features else {} %}
+    {% if strings.urls %}
+    <div class="analysis-section">
+      <h3>네트워크 지표</h3>
+      <div class="urls">
+        <strong>발견된 URL:</strong>
+        {% for url in strings.urls[:10] %}
+          <div class="url-item"><code>{{ url }}</code></div>
+        {% endfor %}
+        {% if strings.urls|length > 10 %}
+          <div class="more">... 및 {{ strings.urls|length - 10 }}개 더</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% set security = data.analysis_report.features.security_indicators if data.analysis_report and data.analysis_report.features else {} %}
+    {% if security %}
+    <div class="analysis-section">
+      <h3>보안 지표</h3>
+      <div class="meta">
+        MOTW: {{ "✓" if security.motw_present else "✗" }} &nbsp;•&nbsp;
+        매크로 보안: {{ security.macro_security_hint or "unknown" }}
+        {% if security.digital_signature and security.digital_signature.signed %}
+        &nbsp;•&nbsp; 디지털 서명: <strong>있음</strong>
+        {% if security.digital_signature.publisher %}
+        ({{ security.digital_signature.publisher }})
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% set virustotal = data.analysis_report.virustotal if data.analysis_report else None %}
+    {% if virustotal and virustotal.available %}
+    {% set scan_summary = virustotal.scan_summary %}
+    {% set detection_rate = (scan_summary.detection_rate or 0)|float %}
+    {% set malicious_count = scan_summary.malicious or 0 %}
+    {% set total_scans = scan_summary.total or 0 %}
+    {% set severity_class = 'safe' %}
+    {% set severity_label = '안전함' %}
+    {% set severity_icon = '🛡️' %}
+    {% set severity_hint = '신뢰할 수 있는 파일입니다' %}
+    {% set action_hint = '이 파일은 대부분의 보안 프로그램에서 안전하다고 판정했습니다. 안심하고 사용하세요.' %}
+    {% if detection_rate >= 50 or malicious_count >= 10 %}
+      {% set severity_class = 'critical' %}
+      {% set severity_label = '매우 위험' %}
+      {% set severity_icon = '🚨' %}
+      {% set severity_hint = '악성 파일일 가능성이 높습니다' %}
+      {% set action_hint = '즉시 파일을 삭제하고 시스템을 점검하세요. 이 파일을 실행하지 마세요.' %}
+    {% elif detection_rate >= 20 or malicious_count >= 5 %}
+      {% set severity_class = 'danger' %}
+      {% set severity_label = '위험' %}
+      {% set severity_icon = '⚠️' %}
+      {% set severity_hint = '악성 파일일 가능성이 있습니다' %}
+      {% set action_hint = '이 파일을 열지 마세요. 격리하거나 삭제를 권장합니다.' %}
+    {% elif detection_rate > 0 %}
+      {% set severity_class = 'warning' %}
+      {% set severity_label = '주의 필요' %}
+      {% set severity_icon = '⚡' %}
+      {% set severity_hint = '일부 의심스러운 특징이 발견됨' %}
+      {% set action_hint = '신중하게 검토 후 사용하세요. 가능하면 다른 출처에서 동일한 파일을 확인해보세요.' %}
+    {% endif %}
+    
+    <div class="analysis-section vt-section">
+      <h3>🔍 VirusTotal 바이러스 검사 결과</h3>
+      
+      <!-- 위험도 요약 카드 -->
+      <div class="vt-risk-card severity-{{ severity_class }}">
+        <div class="vt-risk-header">
+          <div class="vt-risk-icon">{{ severity_icon }}</div>
+          <div class="vt-risk-main">
+            <div class="vt-risk-label">{{ severity_label }}</div>
+            <div class="vt-risk-score">{{ malicious_count }}/{{ total_scans }} 개 프로그램이 위험하다고 판정</div>
+          </div>
+          <div class="vt-risk-percentage">{{ detection_rate|round(1) }}%</div>
+        </div>
+        <div class="vt-risk-hint">{{ severity_hint }}</div>
+        <div class="vt-action-guide">
+          <strong>권장 조치:</strong> {{ action_hint }}
+        </div>
+      </div>
+
+      <!-- 검사 정보 -->
+      <div class="vt-info-grid">
+        <div class="vt-info-item">
+          <div class="vt-info-label">검사 엔진 수</div>
+          <div class="vt-info-value">{{ total_scans }}개</div>
+          <div class="vt-info-desc">전 세계 보안 회사들의 바이러스 검사 프로그램</div>
+        </div>
+        <div class="vt-info-item">
+          <div class="vt-info-label">위험 탐지</div>
+          <div class="vt-info-value severity-{{ severity_class }}">{{ malicious_count }}개</div>
+          <div class="vt-info-desc">악성코드라고 판정한 프로그램 수</div>
+        </div>
+        {% if virustotal.threat_info.suggested_label %}
+        <div class="vt-info-item">
+          <div class="vt-info-label">위협 유형</div>
+          <div class="vt-info-value">{{ virustotal.threat_info.suggested_label }}</div>
+          <div class="vt-info-desc">발견된 악성코드의 종류</div>
+        </div>
+        {% endif %}
+        {% if virustotal.timestamps.last_analysis %}
+        <div class="vt-info-item">
+          <div class="vt-info-label">검사 일시</div>
+          <div class="vt-info-value">{{ virustotal.timestamps.last_analysis.split(' ')[0] }}</div>
+          <div class="vt-info-desc">가장 최근에 검사한 날짜</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- 태그 정보 -->
+      {% if virustotal.threat_info.tags %}
+      <div class="vt-tags-section">
+        <div class="vt-tags-label">🏷️ 파일 특징</div>
+        <div class="vt-tags">
+          {% for tag in virustotal.threat_info.tags %}
+          <span class="vt-tag">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- 상세 검사 결과 -->
+      {% if virustotal.vendor_results %}
+      <div class="vt-details-section">
+        <div class="vt-details-header">
+          <span>📋 주요 보안 회사별 검사 결과</span>
+          <button class="vt-toggle-btn" onclick="toggleVtDetails()">상세보기</button>
+        </div>
+        <div class="vt-vendor-container" id="vtVendorContainer" style="display: none;">
+          <div class="vt-vendor-summary">
+            {% set detected_vendors = [] %}
+            {% set clean_vendors = [] %}
+            {% for vendor, result in virustotal.vendor_results.items() %}
+              {% if result.detected %}
+                {% set _ = detected_vendors.append(vendor) %}
+              {% else %}
+                {% set _ = clean_vendors.append(vendor) %}
+              {% endif %}
+            {% endfor %}
+            
+            {% if detected_vendors %}
+            <div class="vt-vendor-group danger">
+              <div class="vt-vendor-group-title">⚠️ 위험하다고 판정한 회사 ({{ detected_vendors|length }}개)</div>
+              <div class="vt-vendor-list">
+                {% for vendor in detected_vendors %}
+                <div class="vt-vendor-item danger">
+                  <div class="vt-vendor-name">{{ vendor }}</div>
+                  <div class="vt-vendor-result">{{ virustotal.vendor_results[vendor].result or virustotal.vendor_results[vendor].category }}</div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            
+            {% if clean_vendors %}
+            <div class="vt-vendor-group safe">
+              <div class="vt-vendor-group-title">✅ 안전하다고 판정한 회사 ({{ clean_vendors|length }}개)</div>
+              <div class="vt-vendor-list collapsed" id="cleanVendorList">
+                {% for vendor in clean_vendors[:5] %}
+                <div class="vt-vendor-item safe">
+                  <div class="vt-vendor-name">{{ vendor }}</div>
+                  <div class="vt-vendor-result">정상 파일</div>
+                </div>
+                {% endfor %}
+                {% if clean_vendors|length > 5 %}
+                <div class="vt-show-more" onclick="showMoreVendors()">+ {{ clean_vendors|length - 5 }}개 더 보기</div>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- 추가 정보 및 링크 -->
+      <div class="vt-footer-new">
+        <div class="vt-learn-more">
+          <strong>💡 도움말:</strong> VirusTotal은 전 세계 70여 개 보안 회사의 바이러스 검사 엔진을 사용하여 파일의 안전성을 검증하는 무료 서비스입니다.
+        </div>
+        <div class="vt-links">
+          <a href="{{ virustotal.permalink }}" target="_blank" rel="noopener" class="vt-link-btn">
+            🔗 VirusTotal에서 자세히 보기
+          </a>
+          {% if virustotal.timestamps.first_submission %}
+          <span class="vt-date-info">최초 업로드: {{ virustotal.timestamps.first_submission.split(' ')[0] }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% elif virustotal and not virustotal.available %}
+    <div class="analysis-section vt-section">
+      <h3>🔍 VirusTotal 바이러스 검사 결과</h3>
+      <div class="vt-error-card">
+        {% if virustotal.error == 'file_not_found' %}
+        <div class="vt-error-icon">❓</div>
+        <div class="vt-error-content">
+          <div class="vt-error-title">검사 정보 없음</div>
+          <div class="vt-error-desc">이 파일은 아직 VirusTotal에 업로드된 적이 없습니다.</div>
+          <div class="vt-error-action">직접 VirusTotal에 파일을 업로드하여 검사를 요청할 수 있습니다.</div>
+        </div>
+        {% elif virustotal.error == 'rate_limit' %}
+        <div class="vt-error-icon">⏳</div>
+        <div class="vt-error-content">
+          <div class="vt-error-title">일시적 제한</div>
+          <div class="vt-error-desc">너무 많은 요청으로 인해 잠시 서비스를 이용할 수 없습니다.</div>
+          <div class="vt-error-action">잠시 후 다시 시도하거나 VirusTotal 웹사이트를 직접 이용해주세요.</div>
+        </div>
+        {% else %}
+        <div class="vt-error-icon">❌</div>
+        <div class="vt-error-content">
+          <div class="vt-error-title">검사 오류</div>
+          <div class="vt-error-desc">VirusTotal 서비스 연결 중 문제가 발생했습니다.</div>
+          <div class="vt-error-action">네트워크 연결을 확인하고 다시 시도해주세요.</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="card">
+    <h2>분석 결과</h2>
+    <div class="meta">분석 결과를 사용할 수 없습니다.</div>
+  </div>
+  {% endif %}
 
   <div class="card">
     <h2>Excerpt</h2>
@@ -29,5 +309,44 @@
   </div>
 
   <div class="footer">MalOffice MVP — generated by FastAPI + Redis</div>
+
+  <script>
+    function toggleVtDetails() {
+      const container = document.getElementById('vtVendorContainer');
+      const btn = document.querySelector('.vt-toggle-btn');
+      
+      if (container.style.display === 'none') {
+        container.style.display = 'block';
+        btn.textContent = '접기';
+      } else {
+        container.style.display = 'none';
+        btn.textContent = '상세보기';
+      }
+    }
+
+    function showMoreVendors() {
+      const cleanList = document.getElementById('cleanVendorList');
+      const showMoreBtn = document.querySelector('.vt-show-more');
+      
+      if (cleanList.classList.contains('collapsed')) {
+        cleanList.classList.remove('collapsed');
+        showMoreBtn.textContent = '접기';
+      } else {
+        cleanList.classList.add('collapsed');
+        const hiddenCount = cleanList.querySelectorAll('.vt-vendor-item:nth-child(n+6)').length;
+        showMoreBtn.textContent = `+ ${hiddenCount}개 더 보기`;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const style = document.createElement('style');
+      style.textContent = `
+        .vt-vendor-list.collapsed .vt-vendor-item:nth-child(n+6) {
+          display: none;
+        }
+      `;
+      document.head.appendChild(style);
+    });
+  </script>
 </body>
 </html>

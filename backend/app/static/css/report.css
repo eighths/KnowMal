@@ -25,6 +25,13 @@ h2 {
   margin: 0 0 6px;
 }
 
+h3 {
+  font-size: 14px;
+  margin: 16px 0 8px;
+  color: #374151;
+  font-weight: 600;
+}
+
 .meta {
   color: #6b7280;
   font-size: 13px;
@@ -46,6 +53,453 @@ pre {
   background: #eef2ff;
   color: #3730a3;
   font-size: 12px;
+  margin-right: 4px;
+}
+
+.badge.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.analysis-section {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.analysis-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.anomalies, .autoexec, .modules {
+  margin-top: 8px;
+}
+
+.module {
+  display: inline-block;
+  background: #f3f4f6;
+  padding: 3px 6px;
+  border-radius: 4px;
+  margin: 2px 4px 2px 0;
+  font-size: 11px;
+  color: #374151;
+}
+
+.urls {
+  margin-top: 8px;
+}
+
+.url-item {
+  margin: 4px 0;
+  padding: 6px 8px;
+  background: #f9fafb;
+  border-left: 2px solid #3b82f6;
+  border-radius: 0 4px 4px 0;
+}
+
+.url-item code {
+  font-size: 11px;
+  color: #1e40af;
+  background: none;
+  padding: 0;
+}
+
+.more {
+  margin-top: 6px;
+  font-style: italic;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.danger {
+  color: #dc2626 !important;
+  font-weight: 600;
+}
+
+/* VirusTotal 섹션 전체 스타일 */
+.vt-section {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: none;
+  border-radius: 16px;
+  padding: 24px;
+  margin-top: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.vt-section h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* 위험도 요약 카드 */
+.vt-risk-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-left: 5px solid #e2e8f0;
+}
+
+.vt-risk-card.severity-safe {
+  border-left-color: #22c55e;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+
+.vt-risk-card.severity-warning {
+  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+}
+
+.vt-risk-card.severity-danger {
+  border-left-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+}
+
+.vt-risk-card.severity-critical {
+  border-left-color: #dc2626;
+  background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+  50% { box-shadow: 0 4px 16px rgba(220, 38, 38, 0.15); }
+}
+
+.vt-risk-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.vt-risk-icon {
+  font-size: 32px;
+  min-width: 40px;
+}
+
+.vt-risk-main {
+  flex: 1;
+}
+
+.vt-risk-label {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.vt-risk-card.severity-safe .vt-risk-label { color: #16a34a; }
+.vt-risk-card.severity-warning .vt-risk-label { color: #d97706; }
+.vt-risk-card.severity-danger .vt-risk-label { color: #dc2626; }
+.vt-risk-card.severity-critical .vt-risk-label { color: #b91c1c; }
+
+.vt-risk-score {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.vt-risk-percentage {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.vt-risk-hint {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.vt-action-guide {
+  background: rgba(0, 0, 0, 0.02);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+/* 정보 그리드 */
+.vt-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.vt-info-item {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.vt-info-label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.vt-info-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.vt-info-value.severity-safe { color: #16a34a; }
+.vt-info-value.severity-warning { color: #d97706; }
+.vt-info-value.severity-danger { color: #dc2626; }
+.vt-info-value.severity-critical { color: #b91c1c; }
+
+.vt-info-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* 태그 섹션 */
+.vt-tags-section {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.vt-tags-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.vt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vt-tag {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1d4ed8;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #93c5fd;
+}
+
+/* 상세 결과 섹션 */
+.vt-details-section {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.vt-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.vt-toggle-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.vt-toggle-btn:hover {
+  background: #2563eb;
+}
+
+.vt-vendor-container {
+  padding: 16px;
+}
+
+.vt-vendor-group {
+  margin-bottom: 20px;
+}
+
+.vt-vendor-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.vt-vendor-group.danger .vt-vendor-group-title {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.vt-vendor-group.safe .vt-vendor-group-title {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.vt-vendor-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.vt-vendor-item {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fafafa;
+}
+
+.vt-vendor-item.danger {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.vt-vendor-item.safe {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.vt-vendor-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.vt-vendor-result {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.vt-show-more {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 12px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  color: #3b82f6;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.vt-show-more:hover {
+  background: #e2e8f0;
+}
+
+/* 푸터 섹션 */
+.vt-footer-new {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.vt-learn-more {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.vt-links {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.vt-link-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  text-decoration: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.vt-link-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.vt-date-info {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* 에러 카드 */
+.vt-error-card {
+  background: #ffffff;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.vt-error-icon {
+  font-size: 24px;
+  min-width: 30px;
+}
+
+.vt-error-content {
+  flex: 1;
+}
+
+.vt-error-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 6px;
+}
+
+.vt-error-desc {
+  font-size: 14px;
+  color: #b45309;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.vt-error-action {
+  font-size: 13px;
+  color: #78350f;
+  background: #fef3c7;
+  padding: 8px 12px;
+  border-radius: 6px;
 }
 
 .footer {
