@@ -12,7 +12,6 @@ class FileRecord(Base):
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     content_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # ▶ 신규/확장 메타
     source: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 'upload'/'tistory'/'gmail'/...
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)    # 원본 다운로드 URL
     page_url: Mapped[str | None] = mapped_column(Text, nullable=True)      # 발견된 페이지 URL

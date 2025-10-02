@@ -10,9 +10,15 @@ class Settings(BaseSettings):
 
     ALLOWED_ORIGINS: str = "http://localhost"
 
+    # Redis/Share
     REDIS_URL: str = "redis://localhost:6379/0"
     SHARE_TTL_SECONDS: int = 86400
     BASE_URL: str = "http://localhost:8000"
+
+    # VirusTotal API
+    VT_API_KEY: str = ""
+    VT_ENABLED: bool = False
+    VT_CACHE_TTL: int = 604800  # 7일 (VT 결과 캐시 기간)
 
     class Config:
         env_file = ".env.dev"

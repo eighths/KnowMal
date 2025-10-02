@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Static Analysis OLE Schema",
+  "type": "object",
+  "required": [
+    "report_id",
+    "generated_at",
+    "file",
+    "features"
+  ],
+  "properties": {
+    "report_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "file": {
+      "type": "object",
+      "required": [
+        "filename",
+        "extension",
+        "size_bytes",
+        "mime_type",
+        "hash"
+      ],
+      "properties": {
+        "filename": { "type": "string" },
+        "extension": { "type": "string" },
+        "size_bytes": { "type": "integer" },
+        "mime_type": { "type": "string" },
+        "hash": {
+          "type": "object",
+          "required": ["sha256"],
+          "properties": {
+            "sha256": { "type": "string" }
+          }
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "structure": {
+          "type": "object",
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": ["ole", "ooxml"]
+            },
+            "ole_header_valid": { "type": "boolean" },
+            "document_xml_wellformed": { "type": "boolean" },
+            "metadata_anomalies": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "macros": {
+          "type": "object",
+          "properties": {
+            "has_vba": { "type": "boolean" },
+            "modules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "line_count": { "type": "integer" },
+                  "obfuscated": { "type": "boolean" }
+                }
+              }
+            },
+            "autoexec_triggers": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "suspicious_api_calls_count": { "type": "integer" }
+          }
+        },
+        "strings": {
+          "type": "object",
+          "properties": {
+            "urls": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "filepaths": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "obfuscated_strings": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "apis": {
+          "type": "object",
+          "properties": {
+            "winapi_calls": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "count": { "type": "integer" },
+                  "risk": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"]
+                  }
+                },
+                "required": ["name", "count", "risk"]
+              }
+            },
+            "com_progids": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "obfuscation": {
+          "type": "object",
+          "properties": {
+            "entropy": {
+              "type": "object",
+              "properties": {
+                "overall": { "type": "number" },
+                "max": { "type": "number" }
+              }
+            },
+            "entropy_by_part": {
+              "type": "object",
+              "additionalProperties": { "type": "number" }
+            },
+            "suspicious_ops": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "network_indicators": {
+          "type": "object",
+          "properties": {
+            "urls": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "domains": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "security_indicators": {
+          "type": "object",
+          "properties": {
+            "motw_present": { "type": "boolean" },
+            "macro_security_hint": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

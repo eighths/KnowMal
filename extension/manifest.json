@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "permissions": [],
   "host_permissions": [
+    "http://localhost:8000/*", 
+    "http://127.0.0.1:8000/*",
+    "http://13.125.46.188/*",
     "https://knowmal.duckdns.org/*",
     "https://*.tistory.com/*",
     "https://blog.kakaocdn.net/*"
@@ -15,6 +18,12 @@
       "matches": ["https://*.tistory.com/*","https://*.tistory.io/*"],
       "js": ["content.js"],
       "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["images/*"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

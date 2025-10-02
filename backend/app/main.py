@@ -7,15 +7,20 @@ from app.db import init_schema
 from app.config import get_settings
 from fastapi.staticfiles import StaticFiles
 from app.api.tistory import router as tistory_router
+from starlette.responses import RedirectResponse
 
 settings = get_settings()
 app = FastAPI(title=settings.APP_NAME)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+allowed = [o.strip() for o in (getattr(settings, "ALLOWED_ORIGINS", "") or "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_allowed_origins(),
+    #allow_origins=settings.get_allowed_origins(),
+    # allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")],
+    allow_origins=["*"],  # 개발용으로 모든 origin 허용
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,6 +35,10 @@ def startup():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/r/{share_id}", include_in_schema=False)
+def report_alias(share_id: str):
+    return RedirectResponse(url=f"/share/view/{share_id}", status_code=307)
 
 @app.get("/r/{share_id}", response_class=HTMLResponse, tags=["share"])
 def render_share_report(request: Request, share_id: str):

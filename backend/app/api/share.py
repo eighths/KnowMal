@@ -11,8 +11,9 @@ from sqlalchemy import select
 from app.db import SessionLocal
 from app.db.models import FileRecord
 from app.cache.redis_client import get_redis
-from app.cache.keys import share_key
+from app.cache.keys import share_key, file_data_key
 from app.config import get_settings
+from app.core.static_analysis import get_cached_report
 
 router = APIRouter(prefix="/share", tags=["share"])
 templates = Jinja2Templates(directory="app/templates")
@@ -33,12 +34,6 @@ def create_share(
     db: Session = Depends(get_db),
     settings=Depends(get_settings),
 ):
-    """
-    1) DB에서 파일 레코드 조회
-    2) Redis에 공유 페이로드 저장 (TTL 적용)
-    3) BASE_URL(.env) 우선 사용하되, 비어있거나 localhost면 request.base_url로 보정
-    4) report_url 반환
-    """
     row = db.execute(
         select(FileRecord).where(FileRecord.id == file_id)
     ).scalar_one_or_none()
@@ -46,12 +41,33 @@ def create_share(
         raise HTTPException(status_code=404, detail="file not found")
 
     share_id = secrets.token_urlsafe(10)
+
+    analysis_report = None
+    if row.sha256:
+        analysis_report = get_cached_report(row.sha256)
+        if not analysis_report:
+            r = get_redis()
+            cached_data = r.get(file_data_key(row.sha256))
+            if cached_data:
+                try:
+                    data = json.loads(cached_data)
+                    report = data.get("report")
+                    
+                    while isinstance(report, dict) and "report" in report and isinstance(report["report"], dict):
+                        report = report["report"]
+                    
+                    analysis_report = report
+                except Exception:
+                    pass
+
     payload = {
         "file_id": row.id,
         "filename": row.filename,
         "mime_type": row.mime_type,
         "size_bytes": row.size_bytes,
         "content_excerpt": row.content_excerpt or "",
+        "sha256": row.sha256,
+        "analysis_report": analysis_report,
         "created_at": int(time.time()),
     }
 

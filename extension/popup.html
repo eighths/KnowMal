@@ -2,43 +2,100 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>문서 위협 리포트 · 업로드</title>
+  <title>KnowMal</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
   <div class="container">
     <header>
-      <div class="logo" aria-hidden="true"></div>
+      <img src="images/KnowMal_logo.png" alt="KnowMal Logo" class="logo-image">
       <div>
-        <h1>KnowMal</h1>
-        <div class="sub">정적 분석 기반 피처 → AI 예측 · 보고서 링크 생성</div>
+        <div class="title-row">
+          <h1>KnowMal</h1>
+          <div class="provider">제공: AI_Know</div>
+        </div>
+        <div class="sub">문서 실행 전 악성 행위 예측 서비스</div>
       </div>
     </header>
 
+    <!-- 파일 선택/드롭존 -->
     <section class="card">
-      <h2>파일 선택</h2>
       <div id="drop" class="drop" tabindex="0" aria-label="파일 드래그 앤 드롭 영역">
-        파일을 이곳에 드롭하거나,<br> 아래 버튼으로 선택하세요.
+        <div id="dropText" style="display: none;">파일을 이곳에 드롭하거나,<br> 아래 버튼으로 선택하세요.</div>
+        
+        <div id="fileInfo" class="file-info" style="display: none;">
+          <div class="file-icon">📄</div>
+          <div class="file-details">
+            <div class="file-name"></div>
+            <div class="file-size"></div>
+          </div>
+        </div>
+        
+        <!-- 파일 입력을 드롭존 안으로 이동 -->
+        <div class="file-input-container">
+          <button id="fileSelectBtn" class="btn-file-select">
+            <span class="btn-icon">📁</span>
+            파일 선택
+          </button>
+          <input type="file" id="fileInput" style="display: none;" />
+          <div id="fileStatus" class="file-status">드래그하거나 클릭하세요</div>
+        </div>
       </div>
 
-      <div class="row" style="margin-top:8px">
-        <input type="file" id="fileInput" />
+      <!-- 간결한 경고 박스 - 드롭존을 완전히 대체 -->
+      <div id="overallConclusion" class="warning-box" style="display: none;">
+        <div class="warning-icon">🚨</div>
+        <div class="warning-text">
+          <div class="warning-title">위험: 파일을 열지 마세요</div>
+          <div class="warning-subtitle">악성코드가 탐지되었습니다</div>
+        </div>
+      </div>
+      
+      <!-- 접기/펼치기 가능한 상세 분석 결과 -->
+      <div id="detailedResults" class="detailed-results" style="display: none;">
+        <div class="details-header" onclick="toggleDetails()">
+          <span class="details-title">▼ 상세 분석 결과</span>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div class="details-content">
+          <!-- AI 분석 결과 -->
+          <div class="detail-section ai-detail">
+            <div class="detail-label">AI 분석</div>
+            <div class="detail-tags">
+              <span class="detail-tag">악성코드</span>
+              <span class="detail-tag">매크로</span>
+              <span class="detail-tag">의심스러운</span>
+            </div>
+          </div>
+          
+          <!-- VirusTotal 조회 결과 -->
+          <div class="detail-section vt-detail">
+            <div class="detail-label">VirusTotal</div>
+            <div class="detail-stats">
+              <span id="vtDetections">-</span> / <span id="vtTotal">-</span> 엔진 탐지
+            </div>
+          </div>
+        </div>
       </div>
 
+      <!-- 가운데 정렬된 액션 버튼들 -->
       <div class="actions">
         <button id="btnUpload" class="btn-primary" disabled>서버로 전송</button>
-        <button id="btnReport" class="btn-secondary" disabled>리포트 확인</button>
+        <button id="btnReport" class="btn-secondary" disabled>탐지 내역 확인</button>
       </div>
 
-      <div class="row" style="margin-top:8px">
+      <!-- 상태/진행 -->
+      <div class="status-container">
         <span id="statusPill" class="pill">
           <span class="dot" style="background:#9ca3af"></span>대기
         </span>
-        <div class="meter" style="flex:1;min-width:140px;">
+        <div class="meter">
           <span id="prog" class="fill"></span>
         </div>
       </div>
     </section>
+
+    <!-- 분석 결과 섹션 제거됨 - 내용이 종합 판정에 통합됨 -->
   </div>
 
   <script src="config.js"></script>

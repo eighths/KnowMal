@@ -1,14 +1,15 @@
 :root{
-  --bg:#f9fafb; 
-  --panel:#ffffff; 
-  --muted:#6b7280;       
-  --text:#1f2937;          
-  --accent:#2563eb;       
-  --danger:#dc2626;        
-  --warn:#f59e0b;          
-  --chip:#f3f4f6;         
-  --card:#ffffff;     
-  --border:#e5e7eb; 
+  --bg:#f9fafb;            /* 전체 배경 */
+  --panel:#ffffff;         /* 카드/패널 배경 */
+  --muted:#6b7280;         /* 보조 텍스트 */
+  --text:#1f2937;          /* 본문 텍스트 */
+  --accent:#2563eb;        /* 강조색 */
+  --danger:#dc2626;        /* 빨강 */
+  --warn:#f59e0b;          /* 주황 */
+  --safe:#16a34a;          /* 초록 */
+  --chip:#f3f4f6;          /* 칩/뱃지 배경 */
+  --card:#ffffff;          /* 카드 배경 */
+  --border:#e5e7eb;        /* 테두리 */
 }
 
 *{box-sizing:border-box}

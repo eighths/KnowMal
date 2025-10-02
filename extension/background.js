@@ -1,4 +1,16 @@
-const API_BASE = "https://knowmal.duckdns.org"; 
+const API_BASE = "https://knowmal.duckdns.org";  
+
+let isContextValid = true;
+
+chrome.runtime.onSuspend.addListener(() => {
+  isContextValid = false;
+  console.log("Service Worker suspended - context invalidated");
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  isContextValid = true;
+  console.log("Service Worker started - context valid");
+});
 
 async function fetchJSON(url, opts = {}, timeoutMs = 20000) {
   const ctrl = new AbortController();
@@ -19,10 +31,22 @@ async function fetchJSON(url, opts = {}, timeoutMs = 20000) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!isContextValid) {
+    sendResponse({ 
+      ok: false, 
+      error: "Extension context invalidated. Please refresh the page and try again." 
+    });
+    return true;
+  }
+
   if (msg?.type !== "maloffice.fetch") return; 
 
   (async () => {
     try {
+      if (!isContextValid) {
+        throw new Error("Extension context invalidated during processing");
+      }
+
       const { url, init } = msg;
       const resp = await fetch(url, {
         method: init?.method || "GET",
@@ -43,7 +67,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         json: data
       });
     } catch (e) {
-      sendResponse({ ok: false, error: (e && e.message) || String(e) });
+      console.error("Background script error:", e);
+      sendResponse({ 
+        ok: false, 
+        error: (e && e.message) || String(e),
+        contextInvalid: e.message.includes("context invalidated")
+      });
     }
   })();
 
