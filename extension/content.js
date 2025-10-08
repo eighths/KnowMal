@@ -1,5 +1,6 @@
 (() => {
-  const API_BASE = "https://knowmal.duckdns.org";
+  console.log("[KnowMal] content.js loaded on:", window.location.href);
+  const API_BASE = "http://localhost:8000";
   const OFFICE_RE = /\.(docx?|xlsx?|pptx?)$/i;
 
   const STYLE_ID = "maloffice-style-v2";
@@ -268,8 +269,21 @@
     try{
       const u = new URL(aEl.href);
       const name = decodeURIComponent(u.pathname.split("/").pop() || "").toLowerCase();
-      return OFFICE_RE.test(name) || OFFICE_RE.test(aEl.textContent || "");
-    }catch{ return false; }
+      const textMatch = OFFICE_RE.test(aEl.textContent || "");
+      const nameMatch = OFFICE_RE.test(name);
+      console.log("[KnowMal] isOfficeLink check:", {
+        href: aEl.href,
+        name: name,
+        textContent: aEl.textContent,
+        nameMatch: nameMatch,
+        textMatch: textMatch,
+        result: nameMatch || textMatch
+      });
+      return nameMatch || textMatch;
+    }catch(e){ 
+      console.log("[KnowMal] isOfficeLink error:", e);
+      return false; 
+    }
   }
 
   function guessFilename(aEl){
@@ -285,10 +299,20 @@
   }
 
   async function handleClick(e){
+    console.log("[KnowMal] Click detected on:", e.target);
     const a = e.target.closest?.("a");
-    if (!a || !a.href) return;
-    if (!isOfficeLink(a)) return;
-
+    if (!a || !a.href) {
+      console.log("[KnowMal] No link found or no href");
+      return;
+    }
+    console.log("[KnowMal] Link found:", a.href, "text:", a.textContent);
+    
+    if (!isOfficeLink(a)) {
+      console.log("[KnowMal] Not an office link");
+      return;
+    }
+    
+    console.log("[KnowMal] Office link detected, starting flow");
     e.preventDefault(); e.stopPropagation();
 
     showOverlay();
@@ -304,20 +328,25 @@
     };
 
     try{
-      const r1 = await bgFetch("/tistory/fetch_url", {
+      const r1 = await fetch(`${API_BASE}/tistory/fetch_url`, {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify(payload)
       });
-      if (!r1?.ok || !r1.id) throw new Error(r1?.detail || "fetch_url 실패");
+      const r1_json = await r1.json();
+      if (!r1.ok || !r1_json.id) throw new Error(r1_json?.detail || "fetch_url 실패");
 
       setMsg("공유 링크 생성…");
       setProgress(70);
 
-      const r2 = await bgFetch(`/share/create?file_id=${encodeURIComponent(r1.id)}`, { method: "POST" });
-      if (!r2?.ok || !r2.report_url) throw new Error(r2?.detail || "share 실패");
+      const r2 = await fetch(`${API_BASE}/share/create?file_id=${encodeURIComponent(r1_json.id)}`, { 
+        method: "POST",
+        headers: {"Content-Type":"application/json"}
+      });
+      const r2_json = await r2.json();
+      if (!r2.ok || !r2_json.report_url) throw new Error(r2_json?.detail || "share 실패");
 
-      setDone(r2.report_url);
+      setDone(r2_json.report_url);
     }catch(err){
       setError(err.message);
     }

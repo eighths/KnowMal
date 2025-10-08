@@ -8,6 +8,8 @@ from app.config import get_settings
 from fastapi.staticfiles import StaticFiles
 from app.api.tistory import router as tistory_router
 from starlette.responses import RedirectResponse
+from app.api.google_oauth import router as google_oauth_router
+from app.api.gmail_scan import router as gmail_router
 
 settings = get_settings()
 app = FastAPI(title=settings.APP_NAME)
@@ -18,10 +20,8 @@ allowed = [o.strip() for o in (getattr(settings, "ALLOWED_ORIGINS", "") or "").s
 
 app.add_middleware(
     CORSMiddleware,
-    #allow_origins=settings.get_allowed_origins(),
-    # allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")],
-    allow_origins=["*"],  # 개발용으로 모든 origin 허용
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -50,3 +50,10 @@ def render_share_report(request: Request, share_id: str):
 
 app.include_router(scan_router)
 app.include_router(share_router)
+
+app.include_router(google_oauth_router)
+app.include_router(gmail_router)
+
+@app.get("/auth/success")
+def auth_success():
+    return {"ok": True, "msg": "Google 연결 완료. 창을 닫고 다시 시도하세요."}
