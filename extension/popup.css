@@ -21,7 +21,10 @@ header{display:flex;gap:8px;align-items:center;margin-bottom:14px}
   height: 32px;
   object-fit: contain;
   border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(37,99,235,.3);
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+  padding: 4px;
+  border: 1px solid #cbd5e1;
 }
 .title-row{
   display:flex;
@@ -127,7 +130,19 @@ h1{font-size:16px;margin:0;font-weight:700;color:#1f2937}
 }
 
 .file-icon {
-  font-size: 24px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 4px 16px rgba(37,99,235,.3);
+  color: white;
+}
+
+.file-icon svg {
+  color: white;
 }
 
 .file-details {
@@ -475,6 +490,56 @@ h1{font-size:16px;margin:0;font-weight:700;color:#1f2937}
   border-radius: 8px;
 }
 
+.ai-tag-backdoor {
+  background: #dc2626 !important;
+  color: white !important;
+}
+
+.ai-tag-botnet {
+  background: #d97706 !important;
+  color: white !important;
+}
+
+.ai-tag-download {
+  background: #3730a3 !important;
+  color: white !important;
+}
+
+.ai-tag-infiltration {
+  background: #7c3aed !important;
+  color: white !important;
+}
+
+.ai-tag-normal {
+  background: #059669 !important;
+  color: white !important;
+}
+
+.ai-confidence-backdoor {
+  background: #fecaca !important;
+  color: #dc2626 !important;
+}
+
+.ai-confidence-botnet {
+  background: #fef3c7 !important;
+  color: #d97706 !important;
+}
+
+.ai-confidence-download {
+  background: #e0e7ff !important;
+  color: #3730a3 !important;
+}
+
+.ai-confidence-infiltration {
+  background: #f3e8ff !important;
+  color: #7c3aed !important;
+}
+
+.ai-confidence-normal {
+  background: #d1fae5 !important;
+  color: #059669 !important;
+}
+
 .detail-stats {
   font-size: 13px;
   color: #374151;
@@ -791,4 +856,317 @@ h1{font-size:16px;margin:0;font-weight:700;color:#1f2937}
   font-size: 13px;
   color: #6b7280;
   margin-left: 8px;
+}
+
+/* 2단 레이아웃 스타일 */
+.result-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.ai-prediction-section,
+.virustotal-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  min-height: 200px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subsection-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 16px 0 8px 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+/* AI 예측 결과 스타일 */
+.ai-confidence-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confidence-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.confidence-label {
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.confidence-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.network-stats {
+  margin-top: 16px;
+}
+
+.network-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.network-label {
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.network-value {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* VirusTotal 결과 스타일 */
+.vt-risk-card {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.risk-level {
+  font-size: 14px;
+  font-weight: 700;
+  color: #dc2626;
+  margin-bottom: 4px;
+}
+
+.risk-percentage {
+  font-size: 18px;
+  font-weight: 800;
+  color: #dc2626;
+  margin-bottom: 4px;
+}
+
+.risk-details {
+  font-size: 11px;
+  color: #991b1b;
+}
+
+.vt-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.stat-label {
+  color: var(--muted);
+}
+
+.stat-value {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.vt-tags {
+  margin-top: 16px;
+}
+
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.tag {
+  background: #f1f5f9;
+  color: var(--text);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .result-container {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .ai-prediction-section,
+  .virustotal-section {
+    min-height: auto;
+  }
+}
+
+/* AI 위험 카드 스타일 */
+.ai-risk-card {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-risk-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+  animation: shine 3s ease-in-out infinite;
+}
+
+.ai-risk-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 12px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.risk-count {
+  color: #dc2626;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.threat-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.threat-tag {
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.threat-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.threat-tag[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid #374151;
+  max-width: 250px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.threat-tag[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #1f2937;
+  z-index: 1001;
+  margin-bottom: 2px;
+}
+
+.threat-tag:nth-child(1) {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+.threat-tag:nth-child(2) {
+  background: linear-gradient(135deg, #d97706, #b45309);
+}
+
+.threat-tag:nth-child(3) {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+}
+
+.threat-tag:nth-child(1):hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.threat-tag:nth-child(2):hover {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.threat-tag:nth-child(3):hover {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+/* 팝업 크기 조정 */
+body {
+  height: auto;
+  min-height: 340px;
+  max-height: 600px;
+  overflow-y: auto;
 }

@@ -1,4 +1,5 @@
-const API_BASE = "https://knowmal.duckdns.org";  
+const API_BASE = "http://localhost:8000";  //개발용
+//const API_BASE = "https://knowmal.duckdns.org";  
 
 let isContextValid = true;
 

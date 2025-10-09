@@ -130,7 +130,10 @@ def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: i
 
     mime = sniff_mime(file_bytes=file_bytes)
     
-    if "msword" in mime or mime.endswith("ole") or "olecf" in mime:
+    is_office_file = ("msword" in mime or mime.endswith("ole") or "olecf" in mime or 
+                      filename.lower().endswith(('.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx')))
+    
+    if is_office_file:
         try:
             parser = OLEParser(io.BytesIO(file_bytes))
             features = parser.parse()
@@ -165,6 +168,79 @@ def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: i
                 "x_extensions": {}
             }
     else:
+        try:
+            text_content = ""
+            try:
+                text_content = file_bytes.decode("utf-8", "ignore")
+            except:
+                try:
+                    text_content = file_bytes.decode("latin-1", "ignore")
+                except:
+                    text_content = ""
+            
+            from app.core.static_analyzer.utils.feature_utils import (
+                extract_urls, extract_ips, extract_filepaths, extract_registry_keys,
+                extract_obfuscated_strings, detect_obfuscation_ops, extract_user_agents,
+                domain_from_url, filter_nonstandard_domains
+            )
+            
+            urls = extract_urls(text_content)
+            ips = extract_ips(text_content)
+            domains = sorted({d for d in (domain_from_url(u) for u in urls) if d})
+            
+            features = {
+                "structure": {
+                    "format": "binary", 
+                    "metadata_anomalies": [],
+                    "streams_count": 1,
+                    "storages_count": 0
+                },
+                "macros": {
+                    "has_vba": False,
+                    "vba_present": False,
+                    "modules": [],
+                    "autoexec_triggers": [],
+                    "suspicious_api_calls_count": 0
+                },
+                "strings": {
+                    "urls": urls,
+                    "ips": ips,
+                    "filepaths": extract_filepaths(text_content),
+                    "registry_keys": extract_registry_keys(text_content)
+                },
+                "apis": {
+                    "winapi_calls": [],
+                    "com_progids": []
+                },
+                "obfuscation": {
+                    "suspicious_strings": extract_obfuscated_strings(text_content),
+                    "obfuscation_ops": detect_obfuscation_ops(text_content)
+                },
+                "network_indicators": {
+                    "urls": urls,
+                    "domains": filter_nonstandard_domains(domains),
+                    "user_agents": extract_user_agents(text_content)
+                },
+                "security_indicators": {
+                    "motw_present": False,
+                    "macro_security_hint": "unknown",
+                    "digital_signature": {"signed": False},
+                    "amsi_bypass": [],
+                    "edr_evasion": []
+                }
+            }
+            
+        except Exception as e:
+            features = {
+                "structure": {"format": "unknown", "metadata_anomalies": [f"analysis_failed: {str(e)}"]},
+                "macros": {},
+                "strings": {},
+                "apis": {},
+                "obfuscation": {},
+                "network_indicators": {},
+                "security_indicators": {}
+            }
+        
         report = {
             "schema_version": "1.0",
             "report_id": filename,
@@ -177,15 +253,7 @@ def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: i
                 "mime_type": mime,
                 "hash": {"sha256": sha256}
             },
-            "features": {
-                "structure": {"format": "unknown", "metadata_anomalies": ["unsupported_format"]},
-                "macros": {},
-                "strings": {},
-                "apis": {},
-                "obfuscation": {},
-                "network_indicators": {},
-                "security_indicators": {}
-            },
+            "features": features,
             "risk_assessment": {},
             "x_extensions": {}
         }
@@ -211,7 +279,6 @@ def _get_virustotal_analysis(sha256: str) -> Optional[Dict[str, Any]]:
         cached_result = r.get(vt_cache_key)
         
         if cached_result:
-            print(f"VT 캐시 사용: {sha256[:16]}...")
             return json.loads(cached_result)
         
         vt_client = get_virustotal_client()
@@ -223,5 +290,4 @@ def _get_virustotal_analysis(sha256: str) -> Optional[Dict[str, Any]]:
         return vt_result
         
     except Exception as e:
-        print(f"VirusTotal 분석 실패: {e}")
         return None

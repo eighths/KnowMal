@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     VT_ENABLED: bool = False
     VT_CACHE_TTL: int = 604800  # 7일 (VT 결과 캐시 기간)
 
+    REMOTE_TIMEOUT: int = 30  # 원격 파일 다운로드 타임아웃 (초)
+    REMOTE_MAX_BYTES: int = 50 * 1024 * 1024  # 최대 다운로드 크기 (50MB)
+    REMOTE_USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
     class Config:
         env_file = ".env.dev"
         extra = "ignore"

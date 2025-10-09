@@ -14,6 +14,7 @@ from app.cache.redis_client import get_redis
 from app.cache.keys import share_key, file_data_key
 from app.config import get_settings
 from app.core.static_analysis import get_cached_report
+from app.services.ai_model_service import get_ai_model_service
 
 router = APIRouter(prefix="/share", tags=["share"])
 templates = Jinja2Templates(directory="app/templates")
@@ -43,6 +44,8 @@ def create_share(
     share_id = secrets.token_urlsafe(10)
 
     analysis_report = None
+    ai_prediction = None
+    virustotal_result = None
     if row.sha256:
         analysis_report = get_cached_report(row.sha256)
         if not analysis_report:
@@ -57,7 +60,19 @@ def create_share(
                         report = report["report"]
                     
                     analysis_report = report
+                    
+                    ai_prediction = data.get("ai_prediction")
+                    virustotal_result = data.get("virustotal")  
+                    
+                    
                 except Exception:
+                    pass
+        
+        if not ai_prediction and analysis_report:
+            ai_model_service = get_ai_model_service()
+            if ai_model_service.model_loaded:
+                ai_prediction = ai_model_service.predict_malware_type(analysis_report)
+                if ai_prediction:
                     pass
 
     payload = {
@@ -68,6 +83,8 @@ def create_share(
         "content_excerpt": row.content_excerpt or "",
         "sha256": row.sha256,
         "analysis_report": analysis_report,
+        "ai_prediction": ai_prediction,
+        "virustotal": virustotal_result,  
         "created_at": int(time.time()),
     }
 

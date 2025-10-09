@@ -24,7 +24,15 @@
         <div id="dropText" style="display: none;">파일을 이곳에 드롭하거나,<br> 아래 버튼으로 선택하세요.</div>
         
         <div id="fileInfo" class="file-info" style="display: none;">
-          <div class="file-icon">📄</div>
+          <div class="file-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M14 2V8H20" stroke="curentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16 13H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16 17H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 9H9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
           <div class="file-details">
             <div class="file-name"></div>
             <div class="file-size"></div>
@@ -58,21 +66,82 @@
           <span class="toggle-icon">▼</span>
         </div>
         <div class="details-content">
-          <!-- AI 분석 결과 -->
-          <div class="detail-section ai-detail">
-            <div class="detail-label">AI 분석</div>
-            <div class="detail-tags">
-              <span class="detail-tag">악성코드</span>
-              <span class="detail-tag">매크로</span>
-              <span class="detail-tag">의심스러운</span>
+          <!-- 2단 레이아웃 컨테이너 -->
+          <div class="result-container">
+            <!-- AI 예측 결과 (왼쪽) -->
+            <div class="ai-prediction-section">
+              <h3 class="section-title">📊 AI 예측 결과</h3>
+              
+              <!-- AI 위험 요약 카드 -->
+              <div class="ai-risk-card">
+                <div class="ai-risk-title">AI가 탐지한 핵심 위협: <span class="risk-count">3건</span></div>
+                <div class="threat-tags-container">
+                  <span class="threat-tag" data-tooltip="공격자가 사용자의 시스템에 몰래 접근할 수 있도록 만들어진 통로입니다.">BACKDOOR</span>
+                  <span class="threat-tag" data-tooltip="악성코드에 감염된 컴퓨터들이 네트워크로 연결되어 공격자의 명령을 받는 시스템입니다.">BOTNET</span>
+                  <span class="threat-tag" data-tooltip="사용자의 개인정보나 중요한 데이터를 암호화하여 금전을 요구하는 악성코드입니다.">RANSOMWARE</span>
+                </div>
+              </div>
+              
+              <!-- 네트워크 통계 예제 -->
+              <div class="network-stats">
+                <h4 class="subsection-title">네트워크 통계 예제</h4>
+                <div class="network-item">
+                  <span class="network-label">external_session_count:</span>
+                  <span class="network-value" id="netExternalSession">-</span>
+                </div>
+                <div class="network-item">
+                  <span class="network-label">dns_domains_count:</span>
+                  <span class="network-value" id="netDnsDomains">-</span>
+                </div>
+                <div class="network-item">
+                  <span class="network-label">http_host_count:</span>
+                  <span class="network-value" id="netHttpHost">-</span>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          <!-- VirusTotal 조회 결과 -->
-          <div class="detail-section vt-detail">
-            <div class="detail-label">VirusTotal</div>
-            <div class="detail-stats">
-              <span id="vtDetections">-</span> / <span id="vtTotal">-</span> 엔진 탐지
+            
+            <!-- VirusTotal 결과 (오른쪽) -->
+            <div class="virustotal-section">
+              <h3 class="section-title">🔍 VirusTotal 바이러스 검사 결과</h3>
+              
+              <!-- 위험도 카드 -->
+              <div class="vt-risk-card" id="vtRiskCard">
+                <div class="risk-level" id="vtRiskLevel">매우 위험</div>
+                <div class="risk-percentage" id="vtRiskPercentage">43.8%</div>
+                <div class="risk-details" id="vtRiskDetails">32/73 탐지</div>
+              </div>
+              
+              <!-- 검사 통계 -->
+              <div class="vt-stats">
+                <div class="stat-item">
+                  <span class="stat-label">검사 엔진 수:</span>
+                  <span class="stat-value" id="vtTotalEngines">73개</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">탐지 횟수:</span>
+                  <span class="stat-value" id="vtDetections">32개</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">검사 날짜:</span>
+                  <span class="stat-value" id="vtScanDate">2021-09-13</span>
+                </div>
+              </div>
+              
+              <!-- 과일 통칭 태그 -->
+              <div class="vt-tags">
+                <h4 class="subsection-title">파일 특징</h4>
+                <div class="tag-container" id="vtTags">
+                  <span class="tag">open-file</span>
+                  <span class="tag">checks-cpu-name</span>
+                  <span class="tag">detect-debug-environment</span>
+                  <span class="tag">macros</span>
+                  <span class="tag">long-sleeps</span>
+                  <span class="tag">doc</span>
+                  <span class="tag">calls-wmi</span>
+                  <span class="tag">cve-2014-3931</span>
+                  <span class="tag">exploit</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -108,9 +108,41 @@ function updateVirusTotalResult(detections, total) {
     vtDetections.textContent = detections || 0;
     vtTotal.textContent = total || 0;
     vtDetectionsText.textContent = detections || 0;
-    
-    updateOverallConclusion(detections, total);
   }
+  
+  updateVirusTotalSection(detections, total);
+  updateOverallConclusion(detections, total);
+}
+
+function updateVirusTotalSection(detections, total) {
+  const vtRiskLevel = document.getElementById('vtRiskLevel');
+  const vtRiskPercentage = document.getElementById('vtRiskPercentage');
+  const vtRiskDetails = document.getElementById('vtRiskDetails');
+  const vtTotalEngines = document.getElementById('vtTotalEngines');
+  const vtDetections = document.getElementById('vtDetections');
+  const vtScanDate = document.getElementById('vtScanDate');
+  
+  if (vtRiskLevel && vtRiskPercentage && vtRiskDetails) {
+    const percentage = total > 0 ? (detections / total) * 100 : 0;
+    
+    if (percentage >= 50) {
+      vtRiskLevel.textContent = '매우 위험';
+      vtRiskPercentage.textContent = percentage.toFixed(1) + '%';
+      vtRiskDetails.textContent = detections + '/' + total + ' 탐지';
+    } else if (percentage >= 10) {
+      vtRiskLevel.textContent = '주의';
+      vtRiskPercentage.textContent = percentage.toFixed(1) + '%';
+      vtRiskDetails.textContent = detections + '/' + total + ' 탐지';
+    } else {
+      vtRiskLevel.textContent = '정상';
+      vtRiskPercentage.textContent = percentage.toFixed(1) + '%';
+      vtRiskDetails.textContent = detections + '/' + total + ' 탐지';
+    }
+  }
+  
+  if (vtTotalEngines) vtTotalEngines.textContent = total + '개';
+  if (vtDetections) vtDetections.textContent = detections + '개';
+  if (vtScanDate) vtScanDate.textContent = new Date().toLocaleDateString();
 }
 
 function updateOverallConclusion(detections, total) {
@@ -141,6 +173,56 @@ function updateOverallConclusion(detections, total) {
   if (detailedResults) {
     detailedResults.style.display = 'none';
   }
+}
+
+function updateAIAnalysisResult(aiAnalysis) {
+  const detailedResults = document.querySelector('.detailed-results');
+  if (!detailedResults) return;
+  
+  const predictedTypes = aiAnalysis.predicted_types || [];
+  const confidenceScores = aiAnalysis.confidence_scores || {};
+  
+  updateAIPredictionSection(confidenceScores);
+  
+  const aiDetailSection = detailedResults.querySelector('.ai-detail');
+  if (aiDetailSection) {
+    const detailTags = aiDetailSection.querySelector('.detail-tags');
+    if (detailTags) {
+      detailTags.innerHTML = '';
+      
+      predictedTypes.forEach(type => {
+        const tag = document.createElement('span');
+        tag.className = 'detail-tag ai-tag-' + type.toLowerCase();
+        tag.textContent = type;
+        detailTags.appendChild(tag);
+      });
+      
+      Object.entries(confidenceScores).forEach(([type, score]) => {
+        if (score > 0.3 && !predictedTypes.includes(type)) { // 30% 이상이고 예측 타입에 없는 경우
+          const tag = document.createElement('span');
+          tag.className = 'detail-tag ai-confidence-' + type.toLowerCase();
+          tag.textContent = `${type} (${(score * 100).toFixed(1)}%)`;
+          detailTags.appendChild(tag);
+        }
+      });
+    }
+  }
+  
+  console.log('🤖 AI 분석 결과 업데이트:', aiAnalysis);
+}
+
+function updateAIPredictionSection(confidenceScores) {
+  console.log('AI 예측 결과 업데이트 (신뢰도 제거됨)');
+}
+
+function updateNetworkStats(networkStats) {
+  const netExternalSession = document.getElementById('netExternalSession');
+  const netDnsDomains = document.getElementById('netDnsDomains');
+  const netHttpHost = document.getElementById('netHttpHost');
+  
+  if (netExternalSession) netExternalSession.textContent = networkStats.external_session_count || '-';
+  if (netDnsDomains) netDnsDomains.textContent = networkStats.dns_domains_count || '-';
+  if (netHttpHost) netHttpHost.textContent = networkStats.http_host_count || '-';
 }
 
 function toggleDetails() {
@@ -203,6 +285,10 @@ async function loadVirusTotalResult() {
     
     const reportData = await reportRes.json();
     console.log("리포트 데이터:", reportData);
+    
+    if (reportData.ai_prediction && reportData.ai_prediction.ai_analysis) {
+      updateAIAnalysisResult(reportData.ai_prediction.ai_analysis);
+    }
     
     if (reportData.virustotal && reportData.virustotal.available) {
       const malicious = reportData.virustotal.scan_summary?.malicious || 0;
