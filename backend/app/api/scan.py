@@ -13,6 +13,7 @@ from app.cache.redis_client import get_redis
 from app.cache.keys import file_data_key
 from app.config import get_settings
 from app.services.ai_model_service import get_ai_model_service
+from app.services.ensemble_model_service import get_ensemble_model_service
 
 
 router = APIRouter(prefix="/scan", tags=["scan"])
@@ -57,10 +58,10 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
     try:
         report = analyze_bytes(file_bytes, filename, ttl_sec=settings.SHARE_TTL_SECONDS, use_cache=True)
         
-        ai_model_service = get_ai_model_service()
+        ensemble_model_service = get_ensemble_model_service()
         ai_prediction = None
-        if ai_model_service.model_loaded and report:
-            ai_prediction = ai_model_service.predict_malware_type(report)
+        if ensemble_model_service.model_loaded and report:
+            ai_prediction = ensemble_model_service.predict_malware_type(report)
         
         cache_data = {
             "filename": filename,
@@ -135,3 +136,35 @@ def get_report(sha256: str):
             pass
     
     raise HTTPException(status_code=404, detail="report not found")
+
+@router.get("/model/status")
+def get_model_status():
+    ensemble_service = get_ensemble_model_service()
+    ai_service = get_ai_model_service()
+    
+    return {
+        "ensemble_model": ensemble_service.get_model_status(),
+        "legacy_ai_model": {
+            "model_loaded": ai_service.model_loaded,
+            "models_dir_exists": ensemble_service.models_dir.exists()
+        }
+    }
+
+@router.post("/model/reload")
+def reload_models():
+    ensemble_service = get_ensemble_model_service()
+    ensemble_success = ensemble_service.reload_model()
+    
+    ai_service = get_ai_model_service()
+    ai_success = ai_service.load_models()
+    
+    return {
+        "ensemble_model": {
+            "success": ensemble_success,
+            "message": "Ensemble model reloaded successfully" if ensemble_success else "Failed to reload ensemble model"
+        },
+        "legacy_ai_model": {
+            "success": ai_success,
+            "message": "Legacy AI model reloaded successfully" if ai_success else "Failed to reload legacy AI model"
+        }
+    }
