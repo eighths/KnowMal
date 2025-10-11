@@ -154,18 +154,53 @@ function updateOverallConclusion(detections, total) {
   const warningTitle = overallConclusion.querySelector('.warning-title');
   const warningSubtitle = overallConclusion.querySelector('.warning-subtitle');
   
+  // 모든 CSS 클래스 제거
+  overallConclusion.classList.remove('safe', 'danger', 'warning');
+  
   if (percentage >= 50) {
     warningIcon.textContent = '🚨';
     warningTitle.textContent = '위험: 파일을 열지 마세요';
     warningSubtitle.textContent = '악성코드가 탐지되었습니다';
+    
+    // 위험 상태일 때 CSS 클래스 추가
+    overallConclusion.classList.add('danger');
+    
+    // 위험 상태일 때 상세 설명 표시
+    const warningDescription = overallConclusion.querySelector('.warning-description');
+    if (warningDescription) {
+      warningDescription.style.display = 'block';
+      warningDescription.style.marginTop = '8px';
+      warningDescription.style.fontSize = '10px';
+      warningDescription.style.color = '#7f1d1d';
+      warningDescription.style.fontWeight = '500';
+      warningDescription.style.lineHeight = '1.3';
+    }
   } else if (percentage >= 10) {
     warningIcon.textContent = '⚠️';
     warningTitle.textContent = '주의: 신중하게 검토 필요';
     warningSubtitle.textContent = '악성코드 가능성이 있습니다';
+    
+    // 주의 상태일 때 CSS 클래스 추가
+    overallConclusion.classList.add('warning');
+    
+    // 주의 상태일 때 상세 설명 숨김
+    const warningDescription = overallConclusion.querySelector('.warning-description');
+    if (warningDescription) {
+      warningDescription.style.display = 'none';
+    }
   } else {
     warningIcon.textContent = '✅';
-    warningTitle.textContent = '정상: 이상 없음';
-    warningSubtitle.textContent = '알려진 악성코드가 없습니다';
+    warningTitle.textContent = '정상: 안전한 파일';
+    warningSubtitle.textContent = '악성코드를 포함하지 않는 파일입니다';
+    
+    // 정상 상태일 때 CSS 클래스 추가
+    overallConclusion.classList.add('safe');
+    
+    // 상세 설명 숨김
+    const warningDescription = overallConclusion.querySelector('.warning-description');
+    if (warningDescription) {
+      warningDescription.style.display = 'none';
+    }
   }
   
   overallConclusion.style.display = 'flex';
@@ -355,7 +390,7 @@ function resetToInitialState() {
   setPill("", "대기");
   setProgress(0);
   
-  btnUpload.textContent = "서버로 전송"; 
+  btnUpload.textContent = "바이러스 검사"; 
   btnUpload.disabled = true; 
   btnReport.disabled = true;
   
