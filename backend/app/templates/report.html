@@ -299,25 +299,25 @@
         </div>
       </div>
 
+      <!-- 탭 네비게이션 -->
+      <div class="tab-navigation">
+        <button class="tab-button active" data-tab="ai-analysis">
+          AI 네트워크 행위 예측 결과
+        </button>
+        <button class="tab-button" data-tab="virustotal">
+          VirusTotal 바이러스 검사 결과
+        </button>
+      </div>
 
-            
-
-
-
-
-        <!-- AI 네트워크 행위 예측 섹션 -->
+      <!-- AI 네트워크 행위 예측 탭 콘텐츠 -->
+      <div id="ai-analysis-tab" class="tab-content active">
         <div class="analysis-section">
-          <div class="section-header">
-            <h2>AI 네트워크 행위 예측</h2>
-          </div>
           <div class="section-content">
               {% if data.ai_prediction and data.ai_prediction.ai_analysis %}
               {% set ai_analysis = data.ai_prediction.ai_analysis %}
               {% set predicted_types = ai_analysis.predicted_types %}
               {% set confidence_scores = ai_analysis.confidence_scores %}
               {% set model_classes = ai_analysis.model_classes %}
-  
-        <h3>AI 네트워크 행위 예측</h3>
     
           <!-- 위험 항목 그룹 -->
           {% if predicted_types %}
@@ -472,12 +472,11 @@
               {% endif %}
           </div>
         </div>
+      </div>
 
-        <!-- VirusTotal 바이러스 검사 결과 섹션 -->
+      <!-- VirusTotal 바이러스 검사 결과 탭 콘텐츠 -->
+      <div id="virustotal-tab" class="tab-content">
         <div class="analysis-section vt-section">
-          <div class="section-header">
-            <h2>VirusTotal 바이러스 검사 결과</h2>
-          </div>
           <div class="section-content">
             {% set virustotal = data.virustotal if data.virustotal else (data.report.virustotal if data.report and data.report.virustotal else None) %}
             {% if virustotal and virustotal.available %}
@@ -702,8 +701,6 @@
         </div>
       </div>
 
-
-
   {% else %}
   <div class="card">
     <h2>분석 결과</h2>
@@ -867,8 +864,39 @@
       });
     }
 
+    // 탭 전환 기능
+    function initializeTabs() {
+      const tabButtons = document.querySelectorAll('.tab-button');
+      const tabContents = document.querySelectorAll('.tab-content');
+      
+      tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          const targetTab = this.getAttribute('data-tab');
+          
+          // 모든 탭 버튼에서 active 클래스 제거
+          tabButtons.forEach(btn => btn.classList.remove('active'));
+          // 클릭된 탭 버튼에 active 클래스 추가
+          this.classList.add('active');
+          
+          // 모든 탭 콘텐츠 숨기기
+          tabContents.forEach(content => {
+            content.classList.remove('active');
+          });
+          
+          // 해당 탭 콘텐츠 보이기
+          const targetContent = document.getElementById(targetTab + '-tab');
+          if (targetContent) {
+            targetContent.classList.add('active');
+          }
+        });
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
       console.log('DOM 로드 완료');
+      
+      // 탭 기능 초기화
+      initializeTabs();
       
       // 원형 그래프 애니메이션 초기화
       initializeCircularProgress();
