@@ -478,7 +478,7 @@
       <div id="virustotal-tab" class="tab-content">
         <div class="analysis-section vt-section">
           <div class="section-content">
-            {% set virustotal = data.virustotal if data.virustotal else (data.report.virustotal if data.report and data.report.virustotal else None) %}
+            {% set virustotal = data.virustotal if data.virustotal else (data.analysis_report.virustotal if data.analysis_report else None) %}
             {% if virustotal and virustotal.available %}
               {% set scan_summary = virustotal.scan_summary %}
               {% set detection_rate = (scan_summary.detection_rate or 0)|float %}
@@ -511,15 +511,15 @@
                 {% set action_hint = '안전하게 사용할 수 있습니다.' %}
               {% endif %}
             {% else %}
-              <!-- 샘플 데이터 설정 -->
-              {% set detection_rate = 61.8 %}
-              {% set malicious_count = 47 %}
-              {% set total_scans = 76 %}
-              {% set severity_class = 'critical' %}
-              {% set severity_icon = '🚨' %}
-              {% set severity_label = '매우 위험' %}
-              {% set severity_hint = '악성 파일일 가능성이 매우 높습니다' %}
-              {% set action_hint = '즉시 파일을 삭제하고 시스템을 점검하세요. 이 파일을 실행하지 마세요.' %}
+              <!-- VirusTotal 데이터가 없는 경우 -->
+              {% set detection_rate = 0 %}
+              {% set malicious_count = 0 %}
+              {% set total_scans = 0 %}
+              {% set severity_class = 'safe' %}
+              {% set severity_icon = '❓' %}
+              {% set severity_label = '검사 불가' %}
+              {% set severity_hint = 'VirusTotal에서 이 파일을 검사할 수 없습니다' %}
+              {% set action_hint = 'VirusTotal API 키가 설정되지 않았거나 네트워크 오류가 발생했습니다.' %}
             {% endif %}
             
             <!-- 위험도 요약 카드 -->
@@ -552,12 +552,20 @@
               </div>
               <div class="vt-info-item">
                 <div class="vt-info-label">위협 유형</div>
-                <div class="vt-info-value">trojan.bladabindidldr/hancitc</div>
+                {% if virustotal and virustotal.available and virustotal.threat_info %}
+                <div class="vt-info-value">{{ virustotal.threat_info.suggested_label or '알 수 없음' }}</div>
+                {% else %}
+                <div class="vt-info-value">알 수 없음</div>
+                {% endif %}
                 <div class="vt-info-desc">발견된 악성코드의 종류</div>
               </div>
               <div class="vt-info-item">
                 <div class="vt-info-label">검사 일시</div>
-                <div class="vt-info-value">2025-08-14</div>
+                {% if virustotal and virustotal.available and virustotal.timestamps %}
+                <div class="vt-info-value">{{ virustotal.timestamps.last_analysis or '알 수 없음' }}</div>
+                {% else %}
+                <div class="vt-info-value">알 수 없음</div>
+                {% endif %}
                 <div class="vt-info-desc">가장 최근에 검사한 날짜</div>
               </div>
             </div>
@@ -566,23 +574,13 @@
             <div class="vt-tags-section">
               <div class="vt-tags-label">🏷️ 파일 특징</div>
               <div class="vt-tags">
-                <span class="vt-tag">doc</span>
-                <span class="vt-tag">copy-file</span>
-                <span class="vt-tag">auto-close</span>
-                <span class="vt-tag">run-file</span>
-                <span class="vt-tag">exe-pattern</span>
-                <span class="vt-tag">macros</span>
-                <span class="vt-tag">long-sleeps</span>
-                <span class="vt-tag">calls-wmi</span>
-                <span class="vt-tag">environ</span>
-                <span class="vt-tag">create-ole</span>
-                <span class="vt-tag">checks-user-input</span>
-                <span class="vt-tag">open-file</span>
-                <span class="vt-tag">auto-open</span>
-                <span class="vt-tag">write-file</span>
-                <span class="vt-tag">detect-debug-environment</span>
-                <span class="vt-tag">cve-2016-2569</span>
-                <span class="vt-tag">exploit</span>
+                {% if virustotal and virustotal.available and virustotal.threat_info and virustotal.threat_info.tags %}
+                  {% for tag in virustotal.threat_info.tags[:15] %}
+                    <span class="vt-tag">{{ tag }}</span>
+                  {% endfor %}
+                {% else %}
+                  <span class="vt-tag">태그 정보 없음</span>
+                {% endif %}
               </div>
             </div>
 
@@ -594,93 +592,80 @@
               </div>
               <div class="vt-vendor-container" id="vtVendorContainer" style="display: none;">
                 <div class="vt-vendor-summary">
-                  <div class="vt-vendor-group danger">
-                    <div class="vt-vendor-group-title">⚠️ 위험하다고 판정한 회사 ({{ malicious_count }}개)</div>
-                    <div class="vt-vendor-notice">
-                      <div class="vt-notice-text">주요 보안 회사 5개만 표시됩니다. 전체 회사의 상세 정보는 VirusTotal에서 확인하세요.</div>
-                    </div>
-                    <div class="vt-vendor-grid">
-                      <div class="vt-vendor-card danger">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">Microsoft Defender</div>
-                          <div class="vt-vendor-status danger">위험</div>
-                        </div>
-                        <div class="vt-vendor-result">Trojan:Bladabindi</div>
+                  {% if virustotal and virustotal.available and virustotal.vendor_results %}
+                    {% set vendors = virustotal.vendor_results %}
+                    {% set bad_list = [] %}
+                    {% set good_list = [] %}
+                    {% for name, v in vendors.items() %}
+                      {% if v.category in ['malicious','suspicious'] %}
+                        {% set _ = bad_list.append({'name': name, 'result': v.result or '탐지', 'category': v.category}) %}
+                      {% else %}
+                        {% set _ = good_list.append({'name': name, 'result': v.result or '정상', 'category': v.category or 'undetected'}) %}
+                      {% endif %}
+                    {% endfor %}
+
+                    <div class="vt-vendor-group danger">
+                      <div class="vt-vendor-group-title">⚠️ 위험하다고 판정한 회사 ({{ bad_list|length }}개)</div>
+                      <div class="vt-vendor-notice">
+                        <div class="vt-notice-text">주요 보안 회사만 표시됩니다. 전체 회사의 상세 정보는 VirusTotal에서 확인하세요.</div>
                       </div>
-                      <div class="vt-vendor-card danger">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">Kaspersky</div>
-                          <div class="vt-vendor-status danger">위험</div>
+                      <div class="vt-vendor-grid">
+                        {% for item in bad_list %}
+                        <div class="vt-vendor-card danger">
+                          <div class="vt-vendor-header">
+                            <div class="vt-vendor-name">{{ item.name }}</div>
+                            <div class="vt-vendor-status danger">{{ '위험' if item.category=='malicious' else '의심' }}</div>
+                          </div>
+                          <div class="vt-vendor-result">{{ item.result }}</div>
                         </div>
-                        <div class="vt-vendor-result">Trojan.Win32.Bladabindi</div>
-                      </div>
-                      <div class="vt-vendor-card danger">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">Avast</div>
-                          <div class="vt-vendor-status danger">위험</div>
-                        </div>
-                        <div class="vt-vendor-result">Win32:Trojan-gen</div>
-                      </div>
-                      <div class="vt-vendor-card danger">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">Norton</div>
-                          <div class="vt-vendor-status danger">위험</div>
-                        </div>
-                        <div class="vt-vendor-result">Trojan.Gen.2</div>
-                      </div>
-                      <div class="vt-vendor-card danger">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">Bitdefender</div>
-                          <div class="vt-vendor-status danger">위험</div>
-                        </div>
-                        <div class="vt-vendor-result">Trojan.GenericKD.1234567</div>
+                        {% endfor %}
                       </div>
                     </div>
-                  </div>
-                  
-                  <div class="vt-vendor-group safe">
-                    <div class="vt-vendor-group-title">✅ 안전하다고 판정한 회사 ({{ total_scans - malicious_count }}개)</div>
-                    <div class="vt-vendor-notice">
-                      <div class="vt-notice-text">주요 보안 회사 5개만 표시됩니다. 전체 회사의 상세 정보는 VirusTotal에서 확인하세요.</div>
-                    </div>
-                    <div class="vt-vendor-grid" id="cleanVendorList">
-                      <div class="vt-vendor-card safe">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">TrendMicro</div>
-                          <div class="vt-vendor-status safe">안전</div>
-                        </div>
-                        <div class="vt-vendor-result">정상 파일</div>
+
+                    <div class="vt-vendor-group safe">
+                      <div class="vt-vendor-group-title">✅ 안전/미탐지로 판정한 회사 ({{ good_list|length }}개)</div>
+                      <div class="vt-vendor-notice">
+                        <div class="vt-notice-text">주요 보안 회사만 표시됩니다. 전체 회사의 상세 정보는 VirusTotal에서 확인하세요.</div>
                       </div>
-                      <div class="vt-vendor-card safe">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">ESET</div>
-                          <div class="vt-vendor-status safe">안전</div>
+                      <div class="vt-vendor-grid" id="cleanVendorList">
+                        {% for item in good_list %}
+                        <div class="vt-vendor-card safe">
+                          <div class="vt-vendor-header">
+                            <div class="vt-vendor-name">{{ item.name }}</div>
+                            <div class="vt-vendor-status safe">안전</div>
+                          </div>
+                          <div class="vt-vendor-result">{{ item.result }}</div>
                         </div>
-                        <div class="vt-vendor-result">정상 파일</div>
-                      </div>
-                      <div class="vt-vendor-card safe">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">McAfee</div>
-                          <div class="vt-vendor-status safe">안전</div>
-                        </div>
-                        <div class="vt-vendor-result">정상 파일</div>
-                      </div>
-                      <div class="vt-vendor-card safe">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">Sophos</div>
-                          <div class="vt-vendor-status safe">안전</div>
-                        </div>
-                        <div class="vt-vendor-result">정상 파일</div>
-                      </div>
-                      <div class="vt-vendor-card safe">
-                        <div class="vt-vendor-header">
-                          <div class="vt-vendor-name">Malwarebytes</div>
-                          <div class="vt-vendor-status safe">안전</div>
-                        </div>
-                        <div class="vt-vendor-result">정상 파일</div>
+                        {% endfor %}
                       </div>
                     </div>
-                  </div>
+                  {% else %}
+                    <div class="vt-vendor-group danger">
+                      <div class="vt-vendor-group-title">⚠️ 위험하다고 판정한 회사 (0개)</div>
+                      <div class="vt-vendor-grid">
+                        <div class="vt-vendor-card danger">
+                          <div class="vt-vendor-header">
+                            <div class="vt-vendor-name">검사 데이터 없음</div>
+                            <div class="vt-vendor-status danger">위험</div>
+                          </div>
+                          <div class="vt-vendor-result">VirusTotal API 호출 필요</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="vt-vendor-group safe">
+                      <div class="vt-vendor-group-title">✅ 안전/미탐지로 판정한 회사 (0개)</div>
+                      <div class="vt-vendor-grid" id="cleanVendorList">
+                        <div class="vt-vendor-card safe">
+                          <div class="vt-vendor-header">
+                            <div class="vt-vendor-name">검사 데이터 없음</div>
+                            <div class="vt-vendor-status safe">안전</div>
+                          </div>
+                          <div class="vt-vendor-result">VirusTotal API 호출 필요</div>
+                        </div>
+                      </div>
+                    </div>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -691,10 +676,20 @@
                 <strong>💡 Tip:</strong> VirusTotal은 전 세계 70여 개 보안 엔진으로 파일의 안전성을 교차 검증하는 무료 서비스입니다.
               </div>
               <div class="vt-links">
-                <a href="https://www.virustotal.com/gui/search/{{ data.sha256 }}" target="_blank" rel="noopener" class="vt-link-btn">
+                {% if virustotal and virustotal.available and virustotal.permalink %}
+                <a href="{{ virustotal.permalink }}" target="_blank" rel="noopener" class="vt-link-btn">
                   🔗 VirusTotal에서 자세히 보기
                 </a>
-                <span class="vt-date-info">최초 업로드: 2018-08-16</span>
+                {% else %}
+                <a href="https://www.virustotal.com/gui/search/{{ data.sha256 }}" target="_blank" rel="noopener" class="vt-link-btn">
+                  🔗 VirusTotal에서 직접 검색
+                </a>
+                {% endif %}
+                {% if virustotal and virustotal.available and virustotal.timestamps %}
+                <span class="vt-date-info">최초 업로드: {{ virustotal.timestamps.first_submission or '알 수 없음' }}</span>
+                {% else %}
+                <span class="vt-date-info">VirusTotal 데이터 없음</span>
+                {% endif %}
               </div>
             </div>
           </div>

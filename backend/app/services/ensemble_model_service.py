@@ -1,36 +1,24 @@
 import os
 import json
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 
-from app.models.ensemble_model import EnsembleMalwareClassifier
+from app.services.enhanced_ensemble_model_service import EnhancedEnsembleModelService
 
 class EnsembleModelService:
     def __init__(self):
-        self.classifier = None
+        self.enhanced_service = EnhancedEnsembleModelService()
         self.model_loaded = False
         self.models_dir = Path(__file__).parent.parent / "models"
         self.ensemble_model_path = self.models_dir / "ensemble_model.pkl"
     
     def load_models(self) -> bool:
         try:
-            if not self.models_dir.exists():
-                return False
-            
-            if not self.ensemble_model_path.exists():
-                return False
-            
-            self.classifier = EnsembleMalwareClassifier()
-            success = self.classifier.load_model(str(self.ensemble_model_path))
-            
-            if success:
-                self.model_loaded = True
-                model_info = self.classifier.get_model_info()
-                return True
-            else:
-                return False
-                
+            success = self.enhanced_service.load_models()
+            self.model_loaded = success
+            return success
         except Exception as e:
+            print(f"Model loading error: {e}")
             self.model_loaded = False
             return False
     
@@ -39,23 +27,9 @@ class EnsembleModelService:
             return None
         
         try:
-            predicted_classes, class_probabilities = self.classifier.predict(analysis_report)
-            
-            if not predicted_classes:
-                return None
-            
-            result = {
-                "ai_analysis": {
-                    "predicted_types": predicted_classes,
-                    "class_probabilities": class_probabilities,
-                    "model_type": "ensemble",
-                    "model_info": self.classifier.get_model_info()
-                }
-            }
-            
-            return result
-            
+            return self.enhanced_service.predict_malware_type(analysis_report)
         except Exception as e:
+            print(f"Prediction error: {e}")
             return None
     
     def predict_static_only(self, static_features: Dict) -> Optional[Dict]:
@@ -63,52 +37,38 @@ class EnsembleModelService:
             return None
         
         try:
-            analysis_report = {'features': static_features}
-            
-            hard_labels, soft_labels, network_probs = self.classifier.predict_static_only(static_features)
-            
-            result = {
-                "ai_analysis": {
-                    "predicted_types": hard_labels,
-                    "class_probabilities": soft_labels,
-                    "network_feature_probabilities": network_probs,
-                    "model_type": "ensemble"
-                }
-            }
-            
-            return result
-            
+            return self.enhanced_service.predict_static_only(static_features)
         except Exception as e:
+            print(f"Static prediction error: {e}")
             return None
     
-    def _extract_static_features_from_report(self, analysis_report: Dict) -> Optional[Dict]:
+    def get_model_status(self) -> Dict[str, Any]:
         try:
-            if 'report' in analysis_report:
-                actual_report = analysis_report['report']
-                features = actual_report.get('features', {})
-            else:
-                features = analysis_report.get('features', {})
-            
-            if not features:
-                return None
-            
-            return features
-            
+            enhanced_status = self.enhanced_service.get_model_status()
+            enhanced_status.update({
+                "model_loaded": self.model_loaded,
+                "model_path": str(self.ensemble_model_path),
+                "model_exists": self.ensemble_model_path.exists()
+            })
+            return enhanced_status
         except Exception as e:
-            return None
-    
-    def get_model_status(self) -> Dict[str, any]:
-        return {
-            "model_loaded": self.model_loaded,
-            "model_path": str(self.ensemble_model_path),
-            "model_exists": self.ensemble_model_path.exists(),
-            "model_info": self.classifier.get_model_info() if self.classifier else None
-        }
+            print(f"Status error: {e}")
+            return {
+                "model_loaded": self.model_loaded,
+                "model_path": str(self.ensemble_model_path),
+                "model_exists": self.ensemble_model_path.exists(),
+                "error": str(e)
+            }
     
     def reload_model(self) -> bool:
-        self.model_loaded = False
-        self.classifier = None
-        return self.load_models()
+        try:
+            success = self.enhanced_service.reload_models()
+            self.model_loaded = success
+            return success
+        except Exception as e:
+            print(f"Reload error: {e}")
+            self.model_loaded = False
+            return False
 
 _ensemble_model_service = None
 
