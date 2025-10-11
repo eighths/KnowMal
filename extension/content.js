@@ -1,5 +1,6 @@
 (() => {
-  const API_BASE = "https://knowmal.duckdns.org";
+  // const API_BASE = "https://knowmal.duckdns.org";
+  const API_BASE = "http://localhost:8000"; //개발용
   const OFFICE_RE = /\.(docx?|xlsx?|pptx?)$/i;
 
   const STYLE_ID = "maloffice-style-v2";

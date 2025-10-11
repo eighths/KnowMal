@@ -72,7 +72,8 @@ def _read_all_safe(fp, max_size: int = MAX_STREAM_SIZE) -> bytes:
         return b""
 
 def _is_ole_available() -> bool:
-    return olefile is not None
+    available = olefile is not None
+    return available
 
 class OLEParser:
     def __init__(self, file_input: str | Path | io.BytesIO):
