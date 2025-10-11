@@ -16,7 +16,6 @@ class AIModelService:
     def load_models(self) -> bool:
         try:
             if not self.models_dir.exists():
-                print(f"Models directory not found: {self.models_dir}")
                 return False
             
             required_files = [
@@ -29,13 +28,16 @@ class AIModelService:
             for file_name in required_files:
                 file_path = self.models_dir / file_name
                 if not file_path.exists():
-                    print(f"Required model file not found: {file_path}")
                     return False
             
             self.classifier = FinalEnhancedMalwareDocumentClassifier()
             self.classifier.load_models(str(self.models_dir))
-            self.model_loaded = True
             
+            if not hasattr(self.classifier, 'individual_models'):
+                self.model_loaded = False
+                return False
+            
+            self.model_loaded = True
             return True
             
         except Exception as e:
@@ -65,7 +67,6 @@ class AIModelService:
             return result
             
         except Exception as e:
-            print(f"AI 예측 실패: 예측 중 오류 - {str(e)}")
             return None
     
     def _extract_static_features_from_report(self, analysis_report: Dict) -> Optional[Dict]:
@@ -77,7 +78,6 @@ class AIModelService:
                 features = analysis_report.get('features', {})
             
             if not features:
-                print(f"AI 예측 실패: features가 없음 - {analysis_report.keys()}")
                 return None
             
             structure = features.get('structure', {})
@@ -101,7 +101,6 @@ class AIModelService:
             return static_features
             
         except Exception as e:
-            print(f"AI 예측 실패: 특징 추출 중 오류 - {str(e)}")
             return None
 
 _ai_model_service = None

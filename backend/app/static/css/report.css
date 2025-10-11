@@ -10,7 +10,7 @@ body {
   max-width: 880px;
   margin: 20px auto;
   padding: 0 12px;
-  background: #f9fafb;
+  background: #ffffff;
   line-height: 1.6;
 }
 
@@ -61,7 +61,6 @@ pre {
   padding: 20px;
   margin: 16px 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid #f0f0f0;
 }
 
 .card-header-section {
@@ -586,6 +585,39 @@ pre {
   margin-bottom: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #f3f4f6;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.section-content {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* VirusTotal 섹션 특별 스타일 */
+.vt-section {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.vt-section .section-content {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* 모든 상위 컨테이너 높이 제한 제거 */
+body, html {
+  overflow-x: hidden;
+}
+
+/* 강제로 높이 제한 제거 */
+.vt-section * {
+  max-height: none !important;
+}
+
+.vt-section .vt-vendor-group:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .section-title {
@@ -1830,10 +1862,17 @@ pre {
 }
 
 .ai-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  color: white;
+  background: white;
+  border: 1px solid #e5e7eb;
+  color: #1f2937;
   margin-bottom: 20px;
+  width: 100%;
+  max-width: none;
+  margin-left: -12px;
+  margin-right: -12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  box-sizing: border-box;
 }
 
 .ai-prediction-card {
@@ -2974,6 +3013,8 @@ pre {
   margin-bottom: 24px;
   border-radius: 8px;
   padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .prediction-group.danger {
@@ -3031,6 +3072,8 @@ pre {
   margin-bottom: 12px;
   border: 1px solid #e5e7eb;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .prediction-item.danger {
@@ -3339,6 +3382,35 @@ pre {
   margin: 20px 0;
 }
 
+/* 데이터 없음 메시지 스타일 */
+.no-data-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.no-data-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.no-data-text {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.no-data-desc {
+  font-size: 14px;
+  color: #9ca3af;
+  margin-top: 8px;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
   .two-column-layout {
@@ -3465,5 +3537,1028 @@ pre {
   .two-column-layout {
     flex-direction: column !important;
     gap: 20px !important;
+  }
+}
+
+/* 새로운 파일 레이아웃 스타일 */
+.malicious-file-layout,
+.normal-file-layout {
+  padding: 20px;
+}
+
+.file-analysis-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+  margin-bottom: 20px;
+  justify-content: space-between;
+}
+
+.section-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 32px 0;
+  width: 100%;
+}
+
+.virus-total-circle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  min-width: 180px;
+}
+
+.circular-progress {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+}
+
+.progress-ring {
+  transform: rotate(0deg); /* SVG에서 이미 회전 적용됨 */
+}
+
+/* 배경 트랙 스타일 */
+.progress-ring-track {
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.progress-ring-circle {
+  transition: stroke-dasharray 0.5s ease;
+}
+
+/* 진행 상태 호 스타일 */
+.progress-ring-fill {
+  transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+  stroke-linecap: round;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  opacity: 1;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.progress-percentage {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+/* 새로운 원형 그래프 중앙 텍스트 스타일 */
+.progress-status {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.progress-status.malicious-status {
+  color: #dc2626;
+}
+
+.progress-status.normal-status {
+  color: #16a34a;
+}
+
+
+/* 새로운 수치 정보 스타일 */
+.progress-details {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.progress-description {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.progress-count {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.progress-details .progress-percentage {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0;
+}
+
+
+.progress-count.old-style {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+.ai-analysis-tag {
+  display: none; /* 새로운 디자인에서는 사용하지 않음 */
+}
+
+.ai-analysis-tag.malicious-tag {
+  color: #7f1d1d;
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fee2e2 0%, #fff5f5 100%);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.10), inset 0 0 0 1px #fecaca;
+}
+
+.ai-analysis-tag.normal-tag {
+  color: #065f46;
+  border-color: #bbf7d0;
+  background: linear-gradient(180deg, #dcfce7 0%, #f7fff9 100%);
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.10), inset 0 0 0 1px #bbf7d0;
+}
+
+.ai-analysis-tag::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.03) inset;
+}
+
+.ai-analysis-tag.malicious-tag::before {
+  background: #ef4444;
+}
+
+.ai-analysis-tag.normal-tag::before {
+  background: #16a34a;
+}
+
+.tag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.red-dot {
+  background: #dc2626;
+}
+
+.yellow-dot {
+  background: #f59e0b;
+}
+
+.green-dot {
+  background: #10b981;
+}
+
+.blue-dot {
+  background: #3b82f6;
+}
+
+.tag-text {
+  color: #374151;
+}
+
+.file-info-section {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  max-width: 600px;
+  margin-left: auto;
+}
+
+.file-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-label {
+  font-size: 16px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.info-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  word-break: break-all;
+}
+
+.file-actions-and-tags {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: nowrap;
+}
+
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.action-button {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.malicious-button {
+  background: #dc2626;
+  color: white;
+}
+
+.threat-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.threat-tags-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.threat-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.threat-tag.red-tag {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.threat-tag.yellow-tag {
+  background: #fffbeb;
+  border: 1px solid #fed7aa;
+}
+
+.threat-tag.green-tag {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.threat-tag.blue-tag {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.threat-tag.gray-tag {
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-size: 13px;
+  position: relative;
+  box-shadow: none;
+}
+
+.threat-tag.gray-tag::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b7280;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+/* 상태 표시 점 색상 클래스들 */
+.threat-tag.dot-yellow::before {
+  background: #f59e0b;
+}
+
+.threat-tag.dot-red::before {
+  background: #ef4444;
+}
+
+.threat-tag.dot-orange::before {
+  background: #f97316;
+}
+
+.threat-tag.dot-blue::before {
+  background: #3b82f6;
+}
+
+.threat-tag.dot-green::before {
+  background: #10b981;
+}
+
+.threat-tag.dot-purple::before {
+  background: #8b5cf6;
+}
+
+.threat-tag.dot-gray::before {
+  background: #6b7280;
+}
+
+/* 더보기 컨테이너 스타일 */
+.show-more-container {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* 더보기 링크 스타일 */
+.show-more-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8b5cf6;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.show-more-link:hover {
+  color: #7c3aed;
+  text-decoration: none;
+}
+
+.show-more-link .link-icon {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.show-more-link.expanded .link-icon {
+  transform: rotate(180deg);
+}
+
+/* 위협 태그 행 스타일 */
+.threat-tags-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.safe-status-tag {
+  background: #10b981;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.safe-text {
+  color: white;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .file-analysis-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  
+  .file-info-section {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    max-width: 100%;
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .file-actions-and-tags {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  
+  
+  .action-buttons {
+    justify-content: flex-start;
+    flex-shrink: 0;
+  }
+  
+  .threat-tags {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+  
+  .action-button,
+  .threat-tag {
+    flex-shrink: 0;
+  }
+  
+  .show-more-container {
+    margin-top: 8px;
+  }
+  
+  .file-info-section {
+    gap: 16px;
+  }
+  
+  .info-label {
+    font-size: 14px;
+  }
+  
+  .info-value {
+    font-size: 16px;
+  }
+  
+  .circular-progress {
+    width: 120px;
+    height: 120px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+  }
+  
+  .progress-percentage {
+    font-size: 24px;
+  }
+  
+  .progress-status {
+    font-size: 16px;
+  }
+  
+  
+  .progress-details {
+    margin-top: 12px;
+  }
+  
+  .progress-description {
+    font-size: 13px;
+  }
+  
+  .progress-count {
+    font-size: 12px;
+  }
+  
+  .progress-details .progress-percentage {
+    font-size: 20px;
+  }
+  
+  .progress-count.old-style {
+    font-size: 12px;
+  }
+}
+
+/* ================================
+   VirusTotal 스타일
+   ================================ */
+
+/* 위험도 요약 카드 */
+.vt-risk-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-left: 5px solid #e2e8f0;
+}
+
+.vt-risk-card.severity-safe {
+  border-left-color: #22c55e;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+
+.vt-risk-card.severity-warning {
+  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+}
+
+.vt-risk-card.severity-danger {
+  border-left-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+}
+
+.vt-risk-card.severity-critical {
+  border-left-color: #dc2626;
+  background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+  50% { box-shadow: 0 4px 16px rgba(220, 38, 38, 0.15); }
+}
+
+.vt-risk-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.vt-risk-icon {
+  font-size: 32px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.vt-risk-main {
+  flex: 1;
+}
+
+.vt-risk-label {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.vt-risk-card.severity-safe .vt-risk-label { color: #16a34a; }
+.vt-risk-card.severity-warning .vt-risk-label { color: #d97706; }
+.vt-risk-card.severity-danger .vt-risk-label { color: #dc2626; }
+.vt-risk-card.severity-critical .vt-risk-label { color: #b91c1c; }
+
+.vt-risk-score {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.vt-risk-percentage {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.vt-risk-hint {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.vt-action-guide {
+  font-size: 13px;
+  color: #64748b;
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid #e2e8f0;
+  border: 1px solid #e2e8f0;
+}
+
+/* 검사 정보 그리드 */
+.vt-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+  align-items: stretch;
+}
+
+/* 검사 일시 카드 특별 정렬 */
+.vt-info-grid:last-child {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.vt-info-item {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  text-align: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 120px;
+}
+
+.vt-info-label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.vt-info-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  line-height: 1.3;
+}
+
+.vt-info-value.severity-safe { color: #16a34a; }
+.vt-info-value.severity-warning { color: #d97706; }
+.vt-info-value.severity-danger { color: #dc2626; }
+.vt-info-value.severity-critical { color: #b91c1c; }
+
+/* 위험 유형 특별 스타일 */
+.vt-info-item:nth-child(3) .vt-info-value {
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 4px 8px;
+  background: transparent;
+  border-radius: 6px;
+  border: none;
+  display: block;
+  max-width: 100%;
+  word-break: break-all !important;
+  overflow-wrap: break-word !important;
+  hyphens: auto !important;
+  white-space: normal !important;
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+  text-align: center;
+}
+
+.vt-info-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  white-space: normal;
+  max-width: 100%;
+  text-align: center;
+}
+
+/* 태그 섹션 */
+.vt-tags-section {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.vt-tags-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.vt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vt-tag {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+  cursor: default;
+  transition: none !important;
+}
+
+.vt-tag:hover {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+  transform: none !important;
+}
+
+/* 상세 검사 결과 섹션 */
+.vt-details-section {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.vt-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.vt-toggle-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vt-toggle-btn:hover {
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
+  transform: translateY(-1px);
+}
+
+.vt-vendor-container {
+  padding: 16px;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.vt-vendor-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.vt-vendor-group {
+  border-radius: 8px;
+  overflow: visible;
+  max-height: none !important;
+}
+
+.vt-vendor-group.danger {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.vt-vendor-group.safe {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.vt-vendor-group-title {
+  font-weight: 600;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.vt-vendor-group.danger .vt-vendor-group-title {
+  background: #ffffff;
+  color: #dc2626;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.vt-vendor-group.safe .vt-vendor-group-title {
+  background: #ffffff;
+  color: #16a34a;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* 안내 메시지 스타일 */
+.vt-vendor-notice {
+  display: flex;
+  align-items: flex-start;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 12px 16px;
+}
+
+.vt-notice-text {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+  font-weight: 500;
+  width: 100%;
+}
+
+/* 벤더 그리드 레이아웃 */
+.vt-vendor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  max-height: none;
+  overflow-y: visible;
+}
+
+.vt-vendor-grid.collapsed {
+  max-height: 200px;
+  overflow: hidden;
+}
+
+/* 벤더 카드 스타일 */
+.vt-vendor-card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.vt-vendor-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.vt-vendor-card.danger {
+  border-left: 4px solid #dc2626;
+}
+
+.vt-vendor-card.safe {
+  border-left: 4px solid #16a34a;
+}
+
+.vt-vendor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.vt-vendor-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.vt-vendor-status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vt-vendor-status.danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.vt-vendor-status.safe {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.vt-vendor-result {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.4;
+  word-break: break-word;
+  background: #f8fafc;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+
+/* 추가 정보 및 링크 */
+.vt-footer-new {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-top: 32px;
+}
+
+.vt-learn-more {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 12px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  white-space: normal;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.vt-links {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.vt-link-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  text-decoration: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.vt-link-btn:hover {
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
+  transform: translateY(-1px);
+}
+
+.vt-date-info {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .vt-risk-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .vt-risk-icon {
+    margin-bottom: 0;
+  }
+  
+  .vt-info-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  
+  .vt-info-grid:first-child {
+    grid-template-columns: 1fr;
+  }
+  
+  .vt-vendor-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .vt-vendor-result {
+    text-align: left;
+    max-width: none;
+  }
+  
+  .vt-links {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .vt-link-btn {
+    text-align: center;
+  }
+  
+  .vt-vendor-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+  
+  .vt-vendor-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .vt-vendor-status {
+    align-self: flex-end;
+  }
+  
+  .vt-vendor-notice {
+    margin: 8px 12px;
+    padding: 8px 10px;
+  }
+  
+  .vt-notice-text {
+    font-size: 11px;
   }
 }
