@@ -198,27 +198,29 @@
               <!-- 왼쪽: 원형 그래프 (VirusTotal 결과) -->
               <div class="virus-total-circle">
                 <div class="circular-progress" data-percentage="{{ vt_detection_rate|round(1) }}">
-                  <svg class="progress-ring" width="120" height="120">
+                  <svg class="progress-ring" width="180" height="180">
                     <defs>
-                      <linearGradient id="safeGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
-                        <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+                      <linearGradient id="safeGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#15803d;stop-opacity:0.9" />
+                        <stop offset="30%" style="stop-color:#22c55e;stop-opacity:1" />
+                        <stop offset="70%" style="stop-color:#16a34a;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#15803d;stop-opacity:0.9" />
                       </linearGradient>
                     </defs>
-                    <!-- 배경 트랙 (연한 회색 원) -->
-                    <circle class="progress-ring-track" cx="60" cy="60" r="50" stroke="#f3f4f6" stroke-width="12" fill="transparent"/>
-                    <!-- 진행 상태 호 (초록색, 퍼센트에 따라 채워짐) -->
-                    <circle class="progress-ring-fill" cx="60" cy="60" r="50" fill="transparent" stroke-width="12" stroke-linecap="round"
+                    <!-- 배경 트랙 (Normal 상태에서는 투명하게 처리하여 그라데이션만 보이도록) -->
+                    <circle class="progress-ring-track" cx="90" cy="90" r="75" stroke="transparent" stroke-width="18" fill="transparent"/>
+                    <!-- 진행 상태 호 (Normal 상태일 때 항상 100% 채워진 초록색 그라데이션) -->
+                    <circle class="progress-ring-fill" cx="90" cy="90" r="75" fill="transparent" stroke-width="18" stroke-linecap="round"
                             stroke="url(#safeGradient2)" 
-                            stroke-dasharray="314 314" 
-                            stroke-dashoffset="{{ 314 - (vt_detection_rate * 314 / 100) }}"
-                            transform="rotate(-90 60 60)"/>
+                            stroke-dasharray="471 471" 
+                            stroke-dashoffset="0"
+                            transform="rotate(-90 90 90)"/>
                   </svg>
                   <div class="progress-text">
                     <div class="progress-status normal-status">Normal</div>
                   </div>
                 </div>
-                <div class="progress-details">
+                <div class="progress-details" style="display: none;">
                   <div class="progress-description">안전하다고 판정한 회사</div>
                   <div class="progress-count">{{ vt_total_scans - vt_malicious_count }}/{{ vt_total_scans }}개</div>
                   <div class="progress-percentage">{{ vt_detection_rate|round(1) }}%</div>
@@ -284,13 +286,13 @@
             <!-- 안전 태그들 -->
             <div class="threat-tags">
               <div class="threat-tag gray-tag dot-green">
-                <span class="tag-text">디지털 서명 확인됨</span>
+                <span class="tag-text">악성 스크립트 미포함</span>
               </div>
               <div class="threat-tag gray-tag dot-blue">
-                <span class="tag-text">일반 수식 사용</span>
+                <span class="tag-text">매크로/외부 콘텐츠 미사용</span>
               </div>
               <div class="threat-tag gray-tag dot-green">
-                <span class="tag-text">외부 연결 없음</span>
+                <span class="tag-text">실행 가능한 콘텐츠 없음</span>
               </div>
             </div>
           </div>
@@ -511,17 +513,27 @@
                 {% set action_hint = '안전하게 사용할 수 있습니다.' %}
               {% endif %}
             {% else %}
-              <!-- VirusTotal 데이터가 없는 경우 -->
-              {% set detection_rate = 0 %}
-              {% set malicious_count = 0 %}
-              {% set total_scans = 0 %}
-              {% set severity_class = 'safe' %}
-              {% set severity_icon = '❓' %}
-              {% set severity_label = '검사 불가' %}
-              {% set severity_hint = 'VirusTotal에서 이 파일을 검사할 수 없습니다' %}
-              {% set action_hint = 'VirusTotal API 키가 설정되지 않았거나 네트워크 오류가 발생했습니다.' %}
+              <!-- VirusTotal 데이터가 없는 경우 - Empty State UI -->
+              <div class="vt-empty-icon">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- 배경 문서 아이콘 -->
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#F8F9FA"/>
+                  <polyline points="14,2 14,8 20,8" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  
+                  <!-- 돋보기 아이콘 (문서 위에 오버레이) -->
+                  <circle cx="15" cy="12" r="5" stroke="#6B7280" stroke-width="2" fill="white"/>
+                  <path d="m19 16-2.5-2.5" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  
+                  <!-- X 표시 (돋보기 안에) -->
+                  <path d="M13 10l4 4M17 10l-4 4" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <h2 class="vt-empty-title">VirusTotal에 등록된 분석 정보가 없습니다</h2>
+              <p class="vt-empty-description">VirusTotal 커뮤니티에 등록된 분석 기록이 없어, 아직까지 알려진 위협은 발견되지 않았습니다.</p>
             {% endif %}
             
+            {% if virustotal and virustotal.available %}
+            <!-- VirusTotal 데이터가 있는 경우에만 표시되는 기존 UI -->
             <!-- 위험도 요약 카드 -->
             <div class="vt-risk-card severity-{{ severity_class }}">
               <div class="vt-risk-header">
@@ -552,7 +564,7 @@
               </div>
               <div class="vt-info-item">
                 <div class="vt-info-label">위협 유형</div>
-                {% if virustotal and virustotal.available and virustotal.threat_info %}
+                {% if virustotal.threat_info %}
                 <div class="vt-info-value">{{ virustotal.threat_info.suggested_label or '알 수 없음' }}</div>
                 {% else %}
                 <div class="vt-info-value">알 수 없음</div>
@@ -561,7 +573,7 @@
               </div>
               <div class="vt-info-item">
                 <div class="vt-info-label">검사 일시</div>
-                {% if virustotal and virustotal.available and virustotal.timestamps %}
+                {% if virustotal.timestamps %}
                 <div class="vt-info-value">{{ virustotal.timestamps.last_analysis or '알 수 없음' }}</div>
                 {% else %}
                 <div class="vt-info-value">알 수 없음</div>
@@ -574,7 +586,7 @@
             <div class="vt-tags-section">
               <div class="vt-tags-label">🏷️ 파일 특징</div>
               <div class="vt-tags">
-                {% if virustotal and virustotal.available and virustotal.threat_info and virustotal.threat_info.tags %}
+                {% if virustotal.threat_info and virustotal.threat_info.tags %}
                   {% for tag in virustotal.threat_info.tags[:15] %}
                     <span class="vt-tag">{{ tag }}</span>
                   {% endfor %}
@@ -592,7 +604,7 @@
               </div>
               <div class="vt-vendor-container" id="vtVendorContainer" style="display: none;">
                 <div class="vt-vendor-summary">
-                  {% if virustotal and virustotal.available and virustotal.vendor_results %}
+                  {% if virustotal.vendor_results %}
                     {% set vendors = virustotal.vendor_results %}
                     {% set bad_list = [] %}
                     {% set good_list = [] %}
@@ -676,7 +688,7 @@
                 <strong>💡 Tip:</strong> VirusTotal은 전 세계 70여 개 보안 엔진으로 파일의 안전성을 교차 검증하는 무료 서비스입니다.
               </div>
               <div class="vt-links">
-                {% if virustotal and virustotal.available and virustotal.permalink %}
+                {% if virustotal.permalink %}
                 <a href="{{ virustotal.permalink }}" target="_blank" rel="noopener" class="vt-link-btn">
                   🔗 VirusTotal에서 자세히 보기
                 </a>
@@ -685,13 +697,14 @@
                   🔗 VirusTotal에서 직접 검색
                 </a>
                 {% endif %}
-                {% if virustotal and virustotal.available and virustotal.timestamps %}
+                {% if virustotal.timestamps %}
                 <span class="vt-date-info">최초 업로드: {{ virustotal.timestamps.first_submission or '알 수 없음' }}</span>
                 {% else %}
                 <span class="vt-date-info">VirusTotal 데이터 없음</span>
                 {% endif %}
               </div>
             </div>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -842,19 +855,29 @@
           // SVG 크기에 따라 원 둘레 계산
           const svgElement = element.querySelector('.progress-ring');
           const svgWidth = svgElement.getAttribute('width');
-          const radius = svgWidth === '140' ? 60 : 50; // Malicious: 60, Normal: 50
+          const radius = svgWidth === '180' ? 75 : (svgWidth === '140' ? 60 : 50); // Normal: 75, Malicious: 60, 기타: 50
           const circumference = 2 * Math.PI * radius;
           
-          // 초기 상태 설정 (0%에서 시작)
-          fillElement.style.strokeDasharray = circumference + ' ' + circumference;
-          fillElement.style.strokeDashoffset = circumference;
+          // Normal 상태인지 확인 (data-percentage가 0이거나 Normal 텍스트가 있는 경우)
+          const isNormalState = percentage === 0 || element.querySelector('.normal-status');
           
-          // 애니메이션 효과로 실제 퍼센트까지 진행
-          setTimeout(function() {
-            const offset = circumference - (percentage / 100) * circumference;
-            fillElement.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
-            fillElement.style.strokeDashoffset = offset;
-          }, 200);
+          if (isNormalState) {
+            // Normal 상태일 때는 애니메이션 없이 항상 100% 채워진 상태로 고정
+            fillElement.style.strokeDasharray = circumference + ' ' + circumference;
+            fillElement.style.strokeDashoffset = '0';
+            fillElement.style.transition = 'none'; // 애니메이션 비활성화
+          } else {
+            // Malicious 상태일 때만 애니메이션 적용
+            fillElement.style.strokeDasharray = circumference + ' ' + circumference;
+            fillElement.style.strokeDashoffset = circumference;
+            
+            // 애니메이션 효과로 실제 퍼센트까지 진행
+            setTimeout(function() {
+              const offset = circumference - (percentage / 100) * circumference;
+              fillElement.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
+              fillElement.style.strokeDashoffset = offset;
+            }, 200);
+          }
         }
       });
     }
