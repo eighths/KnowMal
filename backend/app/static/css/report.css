@@ -585,22 +585,44 @@ pre {
   margin-bottom: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #f3f4f6;
+  /* 높이 제한 완전 제거 */
+  height: auto !important;
+  min-height: auto !important;
   max-height: none !important;
   overflow: visible !important;
 }
 
 .section-content {
+  /* 높이 제한 완전 제거 */
+  height: auto !important;
+  min-height: auto !important;
   max-height: none !important;
   overflow: visible !important;
 }
 
+/* VirusTotal 섹션에서 빈 상태일 때만 중앙 정렬 */
+.vt-section .section-content:has(.vt-empty-icon) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 400px;
+}
+
 /* VirusTotal 섹션 특별 스타일 */
 .vt-section {
+  /* 높이 제한 완전 제거 */
+  height: auto !important;
+  min-height: auto !important;
   max-height: none !important;
   overflow: visible !important;
 }
 
 .vt-section .section-content {
+  /* 높이 제한 완전 제거 */
+  height: auto !important;
+  min-height: auto !important;
   max-height: none !important;
   overflow: visible !important;
 }
@@ -608,11 +630,36 @@ pre {
 /* 모든 상위 컨테이너 높이 제한 제거 */
 body, html {
   overflow-x: hidden;
+  overflow-y: visible;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+}
+
+/* 강제로 모든 컨테이너 높이 제한 제거 */
+#virustotal-tab,
+#virustotal-tab *,
+.analysis-section,
+.analysis-section *,
+.section-content,
+.section-content *,
+.vt-section,
+.vt-section *,
+.tab-content,
+.tab-content * {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 /* 강제로 높이 제한 제거 */
 .vt-section * {
   max-height: none !important;
+  /* 추가 높이 제한 제거 */
+  height: auto !important;
+  min-height: auto !important;
+  overflow: visible !important;
 }
 
 .vt-section .vt-vendor-group:last-child {
@@ -1463,6 +1510,11 @@ body, html {
   padding: 24px;
   margin-top: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  /* 높이 제한 완전 제거 - 콘텐츠 잘림 방지 */
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 .vt-section h3 {
@@ -1493,7 +1545,7 @@ body, html {
 }
 
 .vt-risk-card.severity-danger {
-  border-left-color: #ef4444;
+  border-left-color: #b91c1c;
   background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
 }
 
@@ -1532,7 +1584,7 @@ body, html {
 
 .vt-risk-card.severity-safe .vt-risk-label { color: #16a34a; }
 .vt-risk-card.severity-warning .vt-risk-label { color: #d97706; }
-.vt-risk-card.severity-danger .vt-risk-label { color: #dc2626; }
+.vt-risk-card.severity-danger .vt-risk-label { color: #b91c1c; }
 .vt-risk-card.severity-critical .vt-risk-label { color: #b91c1c; }
 
 .vt-risk-score {
@@ -1595,7 +1647,7 @@ body, html {
 
 .vt-info-value.severity-safe { color: #16a34a; }
 .vt-info-value.severity-warning { color: #d97706; }
-.vt-info-value.severity-danger { color: #dc2626; }
+.vt-info-value.severity-danger { color: #b91c1c; }
 .vt-info-value.severity-critical { color: #b91c1c; }
 
 .vt-info-desc {
@@ -2979,9 +3031,14 @@ body, html {
   padding: 24px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border: 1px solid #e5e7eb;
-  overflow: hidden;
+  /* overflow: hidden 제거 - 콘텐츠 잘림 방지 */
+  overflow: visible !important;
   box-sizing: border-box;
   position: relative;
+  /* 높이 자동 조정 */
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
 }
 
 .analysis-section h2 {
@@ -3005,6 +3062,11 @@ body, html {
 .two-column-layout .analysis-section {
   margin-bottom: 0 !important;
   width: 100% !important;
+  /* 높이 자동 조정 및 오버플로우 허용 */
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 /* AI 예측 결과 스타일 */
@@ -3548,7 +3610,7 @@ body, html {
 
 .file-analysis-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 48px;
   margin-bottom: 20px;
   justify-content: space-between;
@@ -3565,6 +3627,7 @@ body, html {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   flex-shrink: 0;
   min-width: 180px;
@@ -3575,6 +3638,79 @@ body, html {
   width: 140px;
   height: 140px;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Normal 상태일 때 원형 그래프 크기 확대 */
+.circular-progress[data-percentage="0"] {
+  width: 200px;
+  height: 200px;
+}
+
+/* Normal 상태일 때 텍스트 크기도 확대 */
+.circular-progress[data-percentage="0"] .progress-status {
+  font-size: 24px;
+}
+
+/* Normal 상태일 때 완벽한 수직 중앙 정렬 보장 */
+.normal-file-layout .file-analysis-header {
+  align-items: center;
+  min-height: 220px;
+}
+
+/* ========================================
+   VirusTotal Empty State UI 스타일
+   ======================================== */
+
+.vt-empty-icon {
+  margin-bottom: 24px;
+  opacity: 0.7;
+}
+
+.vt-empty-icon svg {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.vt-empty-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 16px 0;
+  line-height: 1.3;
+  text-align: center;
+  max-width: 600px;
+}
+
+.vt-empty-description {
+  font-size: 16px;
+  color: #6B7280;
+  margin: 0;
+  line-height: 1.5;
+  font-weight: 400;
+  text-align: center;
+  max-width: 600px;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .vt-empty-title {
+    font-size: 20px;
+    max-width: 100%;
+  }
+  
+  .vt-empty-description {
+    font-size: 14px;
+    max-width: 100%;
+  }
+  
+  .vt-empty-icon svg {
+    width: 60px;
+    height: 60px;
+  }
 }
 
 .progress-ring {
@@ -3599,12 +3735,26 @@ body, html {
   opacity: 1;
 }
 
+/* Normal 상태일 때는 애니메이션 비활성화 */
+.circular-progress[data-percentage="0"] .progress-ring-fill,
+.circular-progress:has(.normal-status) .progress-ring-fill {
+  transition: none !important;
+}
+
 .progress-text {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
 }
 
 .progress-percentage {
@@ -3621,7 +3771,13 @@ body, html {
   font-weight: 700;
   line-height: 1;
   text-align: center;
-  margin-bottom: 4px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
 }
 
 .progress-status.malicious-status {
@@ -3629,7 +3785,9 @@ body, html {
 }
 
 .progress-status.normal-status {
-  color: #16a34a;
+  color: #15803d;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(21, 128, 61, 0.1);
 }
 
 
@@ -3736,6 +3894,7 @@ body, html {
   gap: 48px;
   max-width: 600px;
   margin-left: auto;
+  align-items: center;
 }
 
 .file-info-item {
@@ -3927,7 +4086,7 @@ body, html {
   background: #10b981;
   color: white;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 20px;
   font-size: 14px;
   font-weight: 700;
   text-transform: uppercase;
@@ -4056,7 +4215,7 @@ body, html {
 }
 
 .vt-risk-card.severity-danger {
-  border-left-color: #ef4444;
+  border-left-color: #b91c1c;
   background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
 }
 
@@ -4096,7 +4255,7 @@ body, html {
 
 .vt-risk-card.severity-safe .vt-risk-label { color: #16a34a; }
 .vt-risk-card.severity-warning .vt-risk-label { color: #d97706; }
-.vt-risk-card.severity-danger .vt-risk-label { color: #dc2626; }
+.vt-risk-card.severity-danger .vt-risk-label { color: #b91c1c; }
 .vt-risk-card.severity-critical .vt-risk-label { color: #b91c1c; }
 
 .vt-risk-score {
@@ -4181,7 +4340,7 @@ body, html {
 
 .vt-info-value.severity-safe { color: #16a34a; }
 .vt-info-value.severity-warning { color: #d97706; }
-.vt-info-value.severity-danger { color: #dc2626; }
+.vt-info-value.severity-danger { color: #b91c1c; }
 .vt-info-value.severity-critical { color: #b91c1c; }
 
 /* 위험 유형 특별 스타일 */
@@ -4546,10 +4705,28 @@ body, html {
 .tab-content .analysis-section {
   margin-top: 0;
   margin-bottom: 0;
+  /* 높이 제한 완전 제거 */
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 .tab-content .section-content {
   padding-top: 24px;
+  /* 높이 제한 완전 제거 */
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* 탭 콘텐츠 자체도 높이 제한 제거 */
+.tab-content {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 @keyframes fadeIn {
