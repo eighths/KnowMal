@@ -3644,13 +3644,15 @@ body, html {
 }
 
 /* Normal 상태일 때 원형 그래프 크기 확대 */
-.circular-progress[data-percentage="0"] {
+.circular-progress[data-percentage="0"],
+.circular-progress.is-normal {
   width: 200px;
   height: 200px;
 }
 
 /* Normal 상태일 때 텍스트 크기도 확대 */
-.circular-progress[data-percentage="0"] .progress-status {
+.circular-progress[data-percentage="0"] .progress-status,
+.circular-progress.is-normal .progress-status {
   font-size: 24px;
 }
 
@@ -3659,10 +3661,6 @@ body, html {
   align-items: center;
   min-height: 220px;
 }
-
-/* ========================================
-   VirusTotal Empty State UI 스타일
-   ======================================== */
 
 .vt-empty-icon {
   margin-bottom: 24px;

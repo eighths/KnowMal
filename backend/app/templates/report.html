@@ -197,7 +197,7 @@
             <div class="file-analysis-header">
               <!-- 왼쪽: 원형 그래프 (VirusTotal 결과) -->
               <div class="virus-total-circle">
-                <div class="circular-progress" data-percentage="{{ vt_detection_rate|round(1) }}">
+                <div class="circular-progress is-normal" data-percentage="0">
                   <svg class="progress-ring" width="180" height="180">
                     <defs>
                       <linearGradient id="safeGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -302,6 +302,39 @@
       </div>
 
       <!-- 탭 네비게이션 -->
+      {% set embedded_files = (data.analysis_report.embedded_files if data.analysis_report and data.analysis_report.embedded_files else []) %}
+
+      {% if embedded_files and embedded_files|length > 0 %}
+      <div class="analysis-section" style="margin-top: 24px;">
+        <div class="section-header">
+          <h3>📦 압축 해제된 파일 분석 결과</h3>
+          <div class="section-subtitle">ZIP 내부 파일에 대한 정적 분석 · VirusTotal · AI 예측 요약</div>
+        </div>
+        <div class="embedded-grid">
+          {% for item in embedded_files %}
+          {% set rep = item.report %}
+          <div class="embedded-card">
+            <div class="embedded-head">
+              <div class="embedded-name" title="{{ item.filename }}">{{ item.filename }}</div>
+              <div class="embedded-size">{{ (item.size_bytes / 1024)|round(1) }} KB</div>
+            </div>
+            <div class="embedded-meta">
+              <div class="meta-item"><span class="meta-label">SHA-256</span><span class="meta-value">{{ (item.sha256[:8] + '...' + item.sha256[-4:]) if item.sha256 else 'unknown' }}</span></div>
+              {% set ai_pred = item.ai_prediction %}
+              {% if ai_pred %}
+              <div class="meta-item"><span class="meta-label">AI 예측</span><span class="meta-value">{{ ai_pred.label or ai_pred.class or '예측 결과' }}</span></div>
+              {% endif %}
+              {% if rep and rep.virustotal and rep.virustotal.available %}
+              {% set vt_summary = rep.virustotal.scan_summary %}
+              <div class="meta-item"><span class="meta-label">VirusTotal</span><span class="meta-value">{{ (vt_summary.malicious or 0) }}/{{ (vt_summary.total or 0) }} 탐지</span></div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
       <div class="tab-navigation">
         <button class="tab-button active" data-tab="ai-analysis">
           AI 네트워크 행위 예측 결과

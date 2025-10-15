@@ -4,10 +4,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime
 
-import requests, hashlib, html, re, io, zipfile
+import requests, hashlib, html, re, io, zipfile, json
 
 from app.db import get_db
 from app.config import get_settings
+from app.core.static_analysis import analyze_bytes, analyze_zip_bytes
+from app.cache.redis_client import get_redis
+from app.cache.keys import file_data_key
 
 router = APIRouter(prefix="/tistory", tags=["tistory"])
 
@@ -17,6 +20,7 @@ class FetchReq(BaseModel):
     filename: str | None = None
     page_url: HttpUrl | None = None
     cookies: str | None = None
+    user_agent: str | None = None
 
 
 def _safe_excerpt_bytes(b: bytes, limit_chars: int = 4000) -> str:
@@ -63,17 +67,23 @@ def _extract_docx_text(raw: bytes, limit_chars: int = 4000) -> str:
 @router.post("/fetch_url")
 def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get_settings)):
     headers = {
-        "User-Agent": getattr(settings, "REMOTE_USER_AGENT", "Mozilla/5.0 MalOffice/1.0"),
+        "User-Agent": (req.user_agent or getattr(settings, "REMOTE_USER_AGENT", "Mozilla/5.0 MalOffice/1.0")),
         "Referer": str(req.page_url or req.url),
     }
     if req.cookies:
         headers["Cookie"] = req.cookies
+    # 일반 브라우저와 유사한 기본 헤더 보강 (일부 CDN의 보수적 설정 대응)
+    headers.setdefault("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+    headers.setdefault("Accept-Language", "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
+    headers.setdefault("Connection", "keep-alive")
 
+    sess = requests.Session()
+    sess.headers.update(headers)
+    timeout = int(getattr(settings, "REMOTE_TIMEOUT", 12))
     try:
-        requests.head(
+        sess.head(
             req.url,
-            headers=headers,
-            timeout=int(getattr(settings, "REMOTE_TIMEOUT", 12)),
+            timeout=timeout,
             allow_redirects=True,
         )
     except requests.RequestException:
@@ -81,10 +91,9 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
 
     max_bytes = int(getattr(settings, "REMOTE_MAX_BYTES", 20 * 1024 * 1024))
     try:
-        resp = requests.get(
+        resp = sess.get(
             req.url,
-            headers=headers,
-            timeout=int(getattr(settings, "REMOTE_TIMEOUT", 12)),
+            timeout=timeout,
             allow_redirects=True,
             stream=True,
         )
@@ -92,7 +101,7 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
         raise HTTPException(502, f"get error: {e}")
 
     if resp.status_code >= 400:
-        raise HTTPException(502, f"get failed {resp.status_code}")
+        raise HTTPException(502, f"get failed {resp.status_code} {resp.url}")
 
     sha = hashlib.sha256()
     size = 0
@@ -156,6 +165,74 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
         new_id = db.execute(insert_sql, params2).scalar_one()
         db.commit()
 
+    # 정적 분석 수행 (파일이 다운로드된 경우)
+    analysis_result = None
+    if raw_for_excerpt and len(raw_for_excerpt) > 0:
+        try:
+            def _looks_like_zip_bytes(b: bytes) -> bool:
+                sig = b[:4]
+                return sig.startswith(b"PK\x03\x04") or sig.startswith(b"PK\x05\x06") or sig.startswith(b"PK\x07\x08") or b[:2] == b"PK"
+
+            is_zip = (
+                filename.lower().endswith('.zip') or
+                (mime or '').lower().startswith('application/zip') or
+                (mime or '').lower().endswith('zip') or
+                _looks_like_zip_bytes(raw_for_excerpt)
+            )
+
+            if is_zip:
+                # ZIP 아카이브: 내부 파일 일괄 분석 (비번 없음 또는 'pass')
+                analysis_result = analyze_zip_bytes(
+                    raw_for_excerpt,
+                    filename=filename,
+                    ttl_sec=3600,
+                    use_cache=True,
+                    include_virustotal=True,
+                    passwords=[None, 'pass']
+                )
+
+                # 각 내부 파일에 대해 AI 예측 부여
+                try:
+                    from app.services.ensemble_model_service import get_ensemble_model_service
+                    ens = get_ensemble_model_service()
+                    if ens.model_loaded:
+                        for item in analysis_result.get('embedded_files', []) or []:
+                            rep = item.get('report')
+                            if rep:
+                                try:
+                                    item['ai_prediction'] = ens.predict_malware_type(rep)
+                                except Exception:
+                                    item['ai_prediction'] = None
+                except Exception:
+                    pass
+            else:
+                # 일반 파일 분석
+                analysis_result = analyze_bytes(
+                    file_bytes=raw_for_excerpt,
+                    filename=filename,
+                    ttl_sec=3600,  # 1시간 캐시
+                    use_cache=True,
+                    include_virustotal=True
+                )
+
+            # 분석 결과를 Redis에 저장 (ZIP인 경우에도 동일 키에 저장)
+            r = get_redis()
+            r.set(
+                file_data_key(sha_hex), 
+                json.dumps({
+                    "filename": filename,
+                    "mime_type": mime,
+                    "size_bytes": size,
+                    "sha256": sha_hex,
+                    "report": analysis_result,
+                }, ensure_ascii=False), 
+                ex=3600
+            )
+
+        except Exception as e:
+            print(f"정적 분석 실패 (파일: {filename}, SHA256: {sha_hex}): {e}")
+            pass
+
     return {
         "ok": True,
         "id": new_id,
@@ -164,4 +241,5 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
         "size_bytes": size,
         "sha256": sha_hex,
         "excerpt_preview": excerpt[:1000],
+        "analysis_performed": analysis_result is not None,
     }

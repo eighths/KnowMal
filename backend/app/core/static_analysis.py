@@ -1,5 +1,6 @@
 from __future__ import annotations
 import hashlib, json, os, io, magic, tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -265,6 +266,78 @@ def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: i
     
     r.setex(k, ttl_sec, json.dumps(report, ensure_ascii=False))
     return report
+
+
+def analyze_zip_bytes(
+    zip_bytes: bytes,
+    *,
+    filename: str = "archive.zip",
+    ttl_sec: int = 3600,
+    use_cache: bool = True,
+    include_virustotal: bool = True,
+    passwords: list[str | None] | None = None,
+    max_entries: int = 50,
+    max_each_size_bytes: int = 25 * 1024 * 1024,
+) -> dict:
+
+    if passwords is None:
+        passwords = [None, "pass"]
+
+    archive_size = len(zip_bytes)
+    embedded_files: list[dict] = []
+
+    last_err: Exception | None = None
+    for pwd in passwords:
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                if pwd is not None:
+                    try:
+                        zf.setpassword(pwd.encode("utf-8"))
+                    except Exception:
+                        pass
+
+                for i, info in enumerate(zf.infolist()):
+                    if i >= max_entries:
+                        break
+                    if info.is_dir():
+                        continue
+                    if info.file_size <= 0 or info.file_size > max_each_size_bytes:
+                        continue
+                    try:
+                        with zf.open(info, "r") as f:
+                            inner_bytes = f.read()
+                        inner_name = info.filename
+                        inner_report = analyze_bytes(
+                            inner_bytes,
+                            filename=inner_name,
+                            ttl_sec=ttl_sec,
+                            use_cache=use_cache,
+                            include_virustotal=include_virustotal,
+                        )
+                        embedded_files.append({
+                            "filename": inner_name,
+                            "size_bytes": len(inner_bytes),
+                            "sha256": hashlib.sha256(inner_bytes).hexdigest(),
+                            "report": inner_report,
+                        })
+                    except Exception as e:
+                        continue
+
+            last_err = None
+            break
+        except Exception as e:
+            last_err = e
+            continue
+
+    archive_report = {
+        "schema_version": "1.0",
+        "archive": {
+            "filename": filename,
+            "size_bytes": archive_size,
+        },
+        "embedded_files": embedded_files,
+    }
+    return archive_report
 
 def _get_virustotal_analysis(sha256: str) -> Optional[Dict[str, Any]]:
     from app.config import get_settings

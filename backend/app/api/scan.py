@@ -8,7 +8,7 @@ from app.db import SessionLocal
 from app.db import schema
 from app.db.models import FileRecord
 from app.db.schema import FileOut
-from app.core.static_analysis import sniff_mime, extract_excerpt, analyze_bytes, analyze_file, get_cached_report
+from app.core.static_analysis import sniff_mime, extract_excerpt, analyze_bytes, analyze_file, get_cached_report, analyze_zip_bytes
 from app.cache.redis_client import get_redis
 from app.cache.keys import file_data_key
 from app.config import get_settings
@@ -56,29 +56,68 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
     db.commit()
 
     try:
-        report = analyze_bytes(file_bytes, filename, ttl_sec=settings.SHARE_TTL_SECONDS, use_cache=True)
-        
-        ensemble_model_service = get_ensemble_model_service()
-        ai_prediction = None
-        if ensemble_model_service.model_loaded and report:
-            ai_prediction = ensemble_model_service.predict_malware_type(report)
-        
-        cache_data = {
-            "filename": filename,
-            "mime_type": mime,
-            "size_bytes": size,
-            "sha256": sha256,
-            "file_id": rec.id,
-            "report": report
-        }
-        
-        if ai_prediction:
-            cache_data["ai_prediction"] = ai_prediction
-        
+        def _looks_like_zip_bytes(b: bytes) -> bool:
+            sig = b[:4]
+            return sig.startswith(b"PK\x03\x04") or sig.startswith(b"PK\x05\x06") or sig.startswith(b"PK\x07\x08") or b[:2] == b"PK"
+
+        is_zip = (
+            filename.lower().endswith('.zip') or
+            (mime or '').lower().startswith('application/zip') or
+            (mime or '').lower().endswith('zip') or
+            _looks_like_zip_bytes(file_bytes)
+        )
+
+        if is_zip:
+            report = analyze_zip_bytes(
+                zip_bytes=file_bytes,
+                filename=filename,
+                ttl_sec=settings.SHARE_TTL_SECONDS,
+                use_cache=True,
+                include_virustotal=True,
+                passwords=[None, 'pass']
+            )
+
+            ensemble_model_service = get_ensemble_model_service()
+            if ensemble_model_service.model_loaded:
+                for item in report.get('embedded_files', []) or []:
+                    rep = item.get('report')
+                    if rep:
+                        try:
+                            item['ai_prediction'] = ensemble_model_service.predict_malware_type(rep)
+                        except Exception:
+                            item['ai_prediction'] = None
+
+            cache_data = {
+                "filename": filename,
+                "mime_type": mime,
+                "size_bytes": size,
+                "sha256": sha256,
+                "file_id": rec.id,
+                "report": report
+            }
+        else:
+            report = analyze_bytes(file_bytes, filename, ttl_sec=settings.SHARE_TTL_SECONDS, use_cache=True)
+
+            ensemble_model_service = get_ensemble_model_service()
+            ai_prediction = None
+            if ensemble_model_service.model_loaded and report:
+                ai_prediction = ensemble_model_service.predict_malware_type(report)
+
+            cache_data = {
+                "filename": filename,
+                "mime_type": mime,
+                "size_bytes": size,
+                "sha256": sha256,
+                "file_id": rec.id,
+                "report": report
+            }
+            if ai_prediction:
+                cache_data["ai_prediction"] = ai_prediction
+
         redis_client = get_redis()
         file_cache_key = file_data_key(sha256)
         redis_client.setex(file_cache_key, settings.SHARE_TTL_SECONDS, json.dumps(cache_data, ensure_ascii=False))
-        
+
     except Exception as e:
         background_tasks.add_task(analyze_bytes, file_bytes, filename)
 

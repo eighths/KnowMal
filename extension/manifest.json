@@ -15,9 +15,14 @@
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
-      "matches": ["https://*.tistory.com/*","https://*.tistory.io/*"],
+      "matches": [
+        "https://*.tistory.com/*",
+        "https://*.tistory.io/*",
+        "https://blog.kakaocdn.net/*"
+      ],
       "js": ["content.js"],
-      "run_at": "document_end"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [

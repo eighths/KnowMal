@@ -2,6 +2,7 @@
   // const API_BASE = "https://knowmal.duckdns.org";
   const API_BASE = "http://localhost:8000"; //개발용
   const OFFICE_RE = /\.(docx?|xlsx?|pptx?)$/i;
+  const EXTRA_FILE_RE = /\.(zip|7z|rar|alz|egg|tar|gz|bz2|xz|pdf|hwp|hwpx|txt|rtf|json|ps1|js|vbs|wsf|jar|apk|ipa|exe|dll|msi|bat|cmd|lnk|scr|iso|img|bin)$/i;
 
   const STYLE_ID = "maloffice-style-v2";
   function injectStyles() {
@@ -262,6 +263,17 @@
     });
   }
 
+  function bgFetchBinary(url, init = {}){
+    return new Promise((resolve, reject) => {
+      if (!chrome.runtime?.id){ reject(new Error("Extension context invalidated.")); return; }
+      chrome.runtime.sendMessage({ type: "maloffice.fetchBinary", url, init }, (resp)=>{
+        if (chrome.runtime.lastError){ reject(new Error(chrome.runtime.lastError.message)); return; }
+        if (!resp){ reject(new Error("No response from background script")); return; }
+        resolve(resp);
+      });
+    });
+  }
+
   const getCookies = () => document.cookie || "";
   const getPageUrl = () => location.href;
 
@@ -269,7 +281,12 @@
     try{
       const u = new URL(aEl.href);
       const name = decodeURIComponent(u.pathname.split("/").pop() || "").toLowerCase();
-      return OFFICE_RE.test(name) || OFFICE_RE.test(aEl.textContent || "");
+      const host = (u.hostname || "").toLowerCase();
+      const looksLikeTarget = OFFICE_RE.test(name) || OFFICE_RE.test(aEl.textContent || "");
+      const looksLikeFile = looksLikeTarget || EXTRA_FILE_RE.test(name);
+      const isTistoryHost = /(^|\.)tistory\.(com|io)$/.test(host) || /kakaocdn\.(net|com)$/.test(host);
+      const pathHint = /attach|attachment|file|download/gi.test(u.pathname);
+      return looksLikeFile || (isTistoryHost && pathHint);
     }catch{ return false; }
   }
 
@@ -285,12 +302,38 @@
     }catch{ return "document.bin"; }
   }
 
-  async function handleClick(e){
-    const a = e.target.closest?.("a");
-    if (!a || !a.href) return;
-    if (!isOfficeLink(a)) return;
+  function findDownloadAnchorOrUrl(target){
+    const a1 = target.closest?.("a");
+    if (a1?.href) return { href: a1.href, anchor: a1 };
+    const fig = target.closest?.("figure.fileblock, .fileblock");
+    if (fig){
+      const a2 = fig.querySelector("a[href]");
+      if (a2?.href) return { href: a2.href, anchor: a2 };
+      const elWithData = fig.querySelector("[data-href],[data-url]");
+      const h = elWithData?.getAttribute?.("data-href") || elWithData?.getAttribute?.("data-url");
+      if (h) return { href: h };
+    }
+    const el = target.closest?.("[data-href],[data-url]") || target;
+    const dataHref = el?.getAttribute?.("data-href") || el?.getAttribute?.("data-url");
+    if (dataHref) return { href: dataHref };
+    return null;
+  }
 
-    e.preventDefault(); e.stopPropagation();
+  function cancelEvent(e){
+    try{ e.preventDefault(); }catch{}
+    try{ e.stopImmediatePropagation?.(); }catch{}
+    try{ e.stopPropagation(); }catch{}
+  }
+
+  async function handleClick(e){
+    const found = findDownloadAnchorOrUrl(e.target);
+    if (!found || !found.href) return;
+    const fakeA = { href: found.href, textContent: found.anchor?.textContent || "" };
+    if (!isOfficeLink(fakeA)) return;
+
+    try { console.debug("[KnowMal] final download href:", found.href); } catch {}
+
+    cancelEvent(e);
 
     showOverlay();
     setBadge("진행", "dot");
@@ -298,10 +341,11 @@
     setProgress(25);
 
     const payload = {
-      url: a.href,
-      filename: guessFilename(a),
+      url: found.href,
+      filename: guessFilename(found.anchor || { href: found.href, closest: () => null, textContent: "" }),
       page_url: getPageUrl(),
-      cookies: getCookies()
+      cookies: getCookies(),
+      user_agent: navigator.userAgent
     };
 
     try{
@@ -310,6 +354,7 @@
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify(payload)
       });
+      if (!r1?.ok) { throw new Error(r1?.detail || "fetch_url 실패"); }
       if (!r1?.ok || !r1.id) throw new Error(r1?.detail || "fetch_url 실패");
 
       setMsg("공유 링크 생성…");
@@ -320,10 +365,43 @@
 
       setDone(r2.report_url);
     }catch(err){
-      setError(err.message);
+      try{
+        setBadge("진행", "dot");
+        setMsg("클라이언트 경유 업로드…");
+        setProgress(40);
+
+        const bin = await bgFetchBinary(found.href, {
+          credentials: "include",
+          referrer: getPageUrl(),
+          referrerPolicy: "strict-origin-when-cross-origin",
+          headers: { "Referer": getPageUrl() }
+        });
+        if (!bin?.ok){ throw new Error(`원본 다운로드 실패: HTTP ${bin?.status}`); }
+        const ab = bin.buffer;
+        const fd = new FormData();
+        const fileBlob = new Blob([ab]);
+        fd.append("file", fileBlob, guessFilename(found.anchor || { href: found.href, closest: ()=>null, textContent: "" }));
+
+        const up = await fetch(`${API_BASE}/scan/upload`, { method: "POST", body: fd });
+        if (!up.ok){ throw new Error(`업로드 실패: HTTP ${up.status}`); }
+        const upJson = await up.json();
+        if (!upJson?.ok || !upJson?.id){ throw new Error("업로드 응답 오류"); }
+
+        setMsg("공유 링크 생성…");
+        setProgress(70);
+        const sh = await fetch(`${API_BASE}/share/create?file_id=${encodeURIComponent(upJson.id)}`, { method: "POST" });
+        if (!sh.ok){ throw new Error(`공유 실패: HTTP ${sh.status}`); }
+        const shJson = await sh.json();
+        if (!shJson?.ok || !shJson?.report_url){ throw new Error("공유 응답 오류"); }
+        setDone(shJson.report_url);
+      }catch(e2){
+        setError(e2.message || err.message);
+      }
     }
   }
 
-  window.addEventListener("click", handleClick, true);
-  window.addEventListener("auxclick", handleClick, true);
+  const captureOpts = { capture: true, passive: false };
+  const bubbleOpts = { capture: false, passive: false };
+  window.addEventListener("click", handleClick, bubbleOpts);
+  window.addEventListener("auxclick", handleClick, bubbleOpts);
 })();

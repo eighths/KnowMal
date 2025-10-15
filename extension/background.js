@@ -40,7 +40,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  if (msg?.type !== "maloffice.fetch") return; 
+  if (msg?.type !== "maloffice.fetch" && msg?.type !== "maloffice.fetchBinary") return; 
 
   (async () => {
     try {
@@ -54,19 +54,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         headers: init?.headers || {},
         body: init?.body,
         redirect: "follow",
+        credentials: init?.credentials || "include",
+        referrer: init?.referrer || undefined,
+        referrerPolicy: init?.referrerPolicy || undefined,
       });
 
-      const text = await resp.text();
-      let data = null;
-      try { data = JSON.parse(text); } catch { /* JSON 아니면 null */ }
-
-      sendResponse({
-        ok: resp.ok,
-        status: resp.status,
-        headers: Object.fromEntries(resp.headers.entries()),
-        text,
-        json: data
-      });
+      if (msg.type === "maloffice.fetchBinary") {
+        const buf = await resp.arrayBuffer();
+        sendResponse({
+          ok: resp.ok,
+          status: resp.status,
+          headers: Object.fromEntries(resp.headers.entries()),
+          buffer: buf
+        });
+      } else {
+        const text = await resp.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch { /* JSON 아니면 null */ }
+        sendResponse({
+          ok: resp.ok,
+          status: resp.status,
+          headers: Object.fromEntries(resp.headers.entries()),
+          text,
+          json: data
+        });
+      }
     } catch (e) {
       console.error("Background script error:", e);
       sendResponse({ 
