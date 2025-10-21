@@ -46,6 +46,8 @@ def create_share(
     analysis_report = None
     ai_prediction = None
     virustotal_result = None
+    gemini_explanation = None
+    
     if row.sha256:
         analysis_report = get_cached_report(row.sha256)
         if not analysis_report:
@@ -59,27 +61,40 @@ def create_share(
                         while isinstance(report, dict) and report.get("report") and isinstance(report.get("report"), dict):
                             report = report.get("report")
                         analysis_report = report
+                        
+                        # report 안에서 ai_prediction과 gemini_explanation 추출
+                        ai_prediction = report.get("ai_prediction")
+                        gemini_explanation = report.get("gemini_explanation")
+                        virustotal_result = report.get("virustotal")
                     
-                    ai_prediction = data.get("ai_prediction")
-                    virustotal_result = data.get("virustotal")
-                except Exception:
+                    # fallback: data 레벨에서도 확인
+                    if not ai_prediction:
+                        ai_prediction = data.get("ai_prediction")
+                    if not gemini_explanation:
+                        gemini_explanation = data.get("gemini_explanation")
+                    if not virustotal_result:
+                        virustotal_result = data.get("virustotal")
+                except Exception as e:
+                    print(f"[ERROR] create_share - Redis 데이터 파싱 실패: {e}")
                     pass
+        else:
+            # get_cached_report로 가져온 경우에도 내부 데이터 추출
+            if isinstance(analysis_report, dict):
+                ai_prediction = analysis_report.get("ai_prediction")
+                gemini_explanation = analysis_report.get("gemini_explanation")
+                virustotal_result = analysis_report.get("virustotal")
         
         if not ai_prediction and analysis_report:
             ai_model_service = get_ai_model_service()
             if ai_model_service.model_loaded:
                 ai_prediction = ai_model_service.predict_malware_type(analysis_report)
-                if ai_prediction:
-                    pass
 
-    try:
-        if (not virustotal_result) and isinstance(analysis_report, dict):
-            embedded_vt = analysis_report.get("virustotal")
-            if embedded_vt:
-                virustotal_result = embedded_vt
-    except Exception:
-        pass
-
+    # virustotal fallback
+    if not virustotal_result and isinstance(analysis_report, dict):
+        embedded_vt = analysis_report.get("virustotal")
+        if embedded_vt:
+            virustotal_result = embedded_vt
+    
     payload = {
         "file_id": row.id,
         "filename": row.filename,
@@ -89,7 +104,8 @@ def create_share(
         "sha256": row.sha256,
         "analysis_report": analysis_report,
         "ai_prediction": ai_prediction,
-        "virustotal": virustotal_result,  
+        "virustotal": virustotal_result,
+        "gemini_explanation": gemini_explanation,
         "created_at": int(time.time()),
     }
     
@@ -235,8 +251,27 @@ def view_share(request: Request, share_id: str):
         else:
             print(f"[DEBUG] share.py - analysis_report/report가 없음")
 
-    template_name = "report.html" if is_archive else "report_unzip.html"
-    print(f"[DEBUG] share.py - 선택된 템플릿: {template_name}")
+    template_name = "report_unzip.html" if is_archive else "report.html"
+    print(f"[DEBUG] share.py - 선택된 템플릿: {template_name} (is_archive={is_archive})")
+    print(f"[DEBUG] share.py - data.gemini_explanation 존재: {data.get('gemini_explanation') is not None}")
+    if data.get('gemini_explanation'):
+        gx = data.get('gemini_explanation')
+        print(f"[DEBUG] share.py - gemini_explanation 타입: {type(gx)}")
+        if isinstance(gx, dict):
+            print(f"[DEBUG] share.py - gemini_explanation 키들: {list(gx.keys())}")
+    
+    print(f"[DEBUG] share.py - data.ai_prediction 존재: {data.get('ai_prediction') is not None}")
+    if data.get('ai_prediction'):
+        ai = data.get('ai_prediction')
+        if isinstance(ai, dict) and ai.get('ai_analysis'):
+            ai_analysis = ai.get('ai_analysis')
+            if isinstance(ai_analysis, dict) and ai_analysis.get('model_info'):
+                model_info = ai_analysis.get('model_info')
+                if isinstance(model_info, dict) and model_info.get('enhanced_features'):
+                    enhanced = model_info.get('enhanced_features')
+                    if isinstance(enhanced, dict):
+                        fi = enhanced.get('feature_importance')
+                        print(f"[DEBUG] share.py - feature_importance 존재: {fi is not None}, 개수: {len(fi) if fi else 0}")
     
     return templates.TemplateResponse(
         template_name,

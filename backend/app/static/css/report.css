@@ -14,23 +14,6 @@ body {
   line-height: 1.6;
 }
 
-.text-danger { color: #dc2626 !important; }
-.text-warning { color: #f59e0b !important; }
-.text-safe { color: #059669 !important; }
-.risk-percentage { font-weight: 700; font-size: 15px; }
-
-.chip { padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; }
-.chip-danger { background: #fee2e2; color: #dc2626; }
-.chip-normal { background: #dcfce7; color: #166534; }
-
-.vt-mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.vt-box { border-radius: 6px; padding: 12px; text-align: center; border: 1px solid #e2e8f0; background: #ffffff; }
-.vt-box.danger { background: #fee2e2; border-color: #fca5a5; }
-.vt-box.warning { background: #fffbeb; border-color: #fbbf24; }
-.vt-box.safe { background: #f0fdf4; border-color: #bbf7d0; }
-.vt-number { font-size: 20px; font-weight: 700; }
-.vt-sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
-
 .card {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -602,44 +585,22 @@ pre {
   margin-bottom: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #f3f4f6;
-  /* 높이 제한 완전 제거 */
-  height: auto !important;
-  min-height: auto !important;
   max-height: none !important;
   overflow: visible !important;
 }
 
 .section-content {
-  /* 높이 제한 완전 제거 */
-  height: auto !important;
-  min-height: auto !important;
   max-height: none !important;
   overflow: visible !important;
 }
 
-/* VirusTotal 섹션에서 빈 상태일 때만 중앙 정렬 */
-.vt-section .section-content:has(.vt-empty-icon) {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  min-height: 400px;
-}
-
 /* VirusTotal 섹션 특별 스타일 */
 .vt-section {
-  /* 높이 제한 완전 제거 */
-  height: auto !important;
-  min-height: auto !important;
   max-height: none !important;
   overflow: visible !important;
 }
 
 .vt-section .section-content {
-  /* 높이 제한 완전 제거 */
-  height: auto !important;
-  min-height: auto !important;
   max-height: none !important;
   overflow: visible !important;
 }
@@ -647,36 +608,11 @@ pre {
 /* 모든 상위 컨테이너 높이 제한 제거 */
 body, html {
   overflow-x: hidden;
-  overflow-y: visible;
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
-}
-
-/* 강제로 모든 컨테이너 높이 제한 제거 */
-#virustotal-tab,
-#virustotal-tab *,
-.analysis-section,
-.analysis-section *,
-.section-content,
-.section-content *,
-.vt-section,
-.vt-section *,
-.tab-content,
-.tab-content * {
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
 }
 
 /* 강제로 높이 제한 제거 */
 .vt-section * {
   max-height: none !important;
-  /* 추가 높이 제한 제거 */
-  height: auto !important;
-  min-height: auto !important;
-  overflow: visible !important;
 }
 
 .vt-section .vt-vendor-group:last-child {
@@ -1527,11 +1463,6 @@ body, html {
   padding: 24px;
   margin-top: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  /* 높이 제한 완전 제거 - 콘텐츠 잘림 방지 */
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
 }
 
 .vt-section h3 {
@@ -1562,7 +1493,7 @@ body, html {
 }
 
 .vt-risk-card.severity-danger {
-  border-left-color: #b91c1c;
+  border-left-color: #ef4444;
   background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
 }
 
@@ -1601,7 +1532,7 @@ body, html {
 
 .vt-risk-card.severity-safe .vt-risk-label { color: #16a34a; }
 .vt-risk-card.severity-warning .vt-risk-label { color: #d97706; }
-.vt-risk-card.severity-danger .vt-risk-label { color: #b91c1c; }
+.vt-risk-card.severity-danger .vt-risk-label { color: #dc2626; }
 .vt-risk-card.severity-critical .vt-risk-label { color: #b91c1c; }
 
 .vt-risk-score {
@@ -1664,7 +1595,7 @@ body, html {
 
 .vt-info-value.severity-safe { color: #16a34a; }
 .vt-info-value.severity-warning { color: #d97706; }
-.vt-info-value.severity-danger { color: #b91c1c; }
+.vt-info-value.severity-danger { color: #dc2626; }
 .vt-info-value.severity-critical { color: #b91c1c; }
 
 .vt-info-desc {
@@ -2842,6 +2773,343 @@ body, html {
   border-top: 1px solid #e5e7eb;
 }
 
+/* Gemini 종합 설명 섹션 */
+.gemini-summary-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.summary-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.summary-title {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.summary-content {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #374151;
+  margin-bottom: 12px;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  border: none;
+}
+
+.action-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #374151;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-radius: 6px;
+  border-left: 3px solid #6b7280;
+  margin-bottom: 12px;
+}
+
+/* Gemini XAI 설명 섹션 */
+.gemini-xai-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.xai-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.xai-title {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.xai-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #374151;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  border: none;
+}
+
+.xai-content ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.xai-content li {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: #f9fafb;
+  border-radius: 6px;
+  border-left: 3px solid #6b7280;
+}
+
+/* 특징 중요도 섹션 */
+.feature-importance-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.feature-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.feature-title {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.feature-subtitle {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.feature-content {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  border: none;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.feature-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.feature-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.feature-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feature-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.feature-category.backdoor {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.feature-category.botnet {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.feature-category.download {
+  background: #dbeafe;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.feature-category.infiltration {
+  background: #fed7aa;
+  color: #ea580c;
+  border: 1px solid #fdba74;
+}
+
+.feature-category.kd-xai {
+  background: #e0e7ff;
+  color: #7c3aed;
+  border: 1px solid #c7d2fe;
+}
+
+.feature-category.general {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+.feature-detail {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  word-break: break-word;
+}
+
+/* 클래스별 박스 컨테이너 */
+.class-boxes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.class-box {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.class-box-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.class-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.class-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.class-box-features {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 심플한 피처 행 (박스 없이) */
+.simple-feature-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.simple-feature-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  width: 180px;
+  flex-shrink: 0;
+}
+
+.simple-bar-container {
+  position: relative;
+  flex: 1;
+  height: 24px;
+  background: #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.simple-bar-fill {
+  position: relative;
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
+  border-radius: 10px;
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  min-width: 50px;
+}
+
+.simple-percentage-in-bar {
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}
+
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .feature-importance-section {
+    padding: 16px;
+  }
+  
+  .feature-header {
+    padding: 10px 12px;
+  }
+  
+  .feature-title {
+    font-size: 16px;
+  }
+  
+  .feature-subtitle {
+    font-size: 12px;
+  }
+  
+  .feature-name {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  
+  .explanation-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  
+  .explanation-category {
+    min-width: auto;
+  }
+}
+
 /* AI 설명 카드 (Gemini API) */
 .ai-explanation-card {
   background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
@@ -3048,14 +3316,9 @@ body, html {
   padding: 24px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border: 1px solid #e5e7eb;
-  /* overflow: hidden 제거 - 콘텐츠 잘림 방지 */
-  overflow: visible !important;
+  overflow: hidden;
   box-sizing: border-box;
   position: relative;
-  /* 높이 자동 조정 */
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
 }
 
 .analysis-section h2 {
@@ -3079,11 +3342,6 @@ body, html {
 .two-column-layout .analysis-section {
   margin-bottom: 0 !important;
   width: 100% !important;
-  /* 높이 자동 조정 및 오버플로우 허용 */
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
 }
 
 /* AI 예측 결과 스타일 */
@@ -3627,7 +3885,7 @@ body, html {
 
 .file-analysis-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 48px;
   margin-bottom: 20px;
   justify-content: space-between;
@@ -3644,7 +3902,6 @@ body, html {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 16px;
   flex-shrink: 0;
   min-width: 180px;
@@ -3655,77 +3912,6 @@ body, html {
   width: 140px;
   height: 140px;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Normal 상태일 때 원형 그래프 크기 확대 */
-.circular-progress[data-percentage="0"],
-.circular-progress.is-normal {
-  width: 200px;
-  height: 200px;
-}
-
-/* Normal 상태일 때 텍스트 크기도 확대 */
-.circular-progress[data-percentage="0"] .progress-status,
-.circular-progress.is-normal .progress-status {
-  font-size: 24px;
-}
-
-/* Normal 상태일 때 완벽한 수직 중앙 정렬 보장 */
-.normal-file-layout .file-analysis-header {
-  align-items: center;
-  min-height: 220px;
-}
-
-.vt-empty-icon {
-  margin-bottom: 24px;
-  opacity: 0.7;
-}
-
-.vt-empty-icon svg {
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-}
-
-.vt-empty-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #374151;
-  margin: 0 0 16px 0;
-  line-height: 1.3;
-  text-align: center;
-  max-width: 600px;
-}
-
-.vt-empty-description {
-  font-size: 16px;
-  color: #6B7280;
-  margin: 0;
-  line-height: 1.5;
-  font-weight: 400;
-  text-align: center;
-  max-width: 600px;
-  white-space: nowrap;
-  overflow: visible;
-}
-
-/* 반응형 디자인 */
-@media (max-width: 768px) {
-  .vt-empty-title {
-    font-size: 20px;
-    max-width: 100%;
-  }
-  
-  .vt-empty-description {
-    font-size: 14px;
-    max-width: 100%;
-  }
-  
-  .vt-empty-icon svg {
-    width: 60px;
-    height: 60px;
-  }
 }
 
 .progress-ring {
@@ -3750,26 +3936,12 @@ body, html {
   opacity: 1;
 }
 
-/* Normal 상태일 때는 애니메이션 비활성화 */
-.circular-progress[data-percentage="0"] .progress-ring-fill,
-.circular-progress:has(.normal-status) .progress-ring-fill {
-  transition: none !important;
-}
-
 .progress-text {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  line-height: 1;
-  margin: 0;
-  padding: 0;
 }
 
 .progress-percentage {
@@ -3786,13 +3958,7 @@ body, html {
   font-weight: 700;
   line-height: 1;
   text-align: center;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: auto;
-  height: auto;
+  margin-bottom: 4px;
 }
 
 .progress-status.malicious-status {
@@ -3800,9 +3966,7 @@ body, html {
 }
 
 .progress-status.normal-status {
-  color: #15803d;
-  font-weight: 700;
-  text-shadow: 0 1px 2px rgba(21, 128, 61, 0.1);
+  color: #16a34a;
 }
 
 
@@ -3909,7 +4073,6 @@ body, html {
   gap: 48px;
   max-width: 600px;
   margin-left: auto;
-  align-items: center;
 }
 
 .file-info-item {
@@ -4101,7 +4264,7 @@ body, html {
   background: #10b981;
   color: white;
   padding: 8px 16px;
-  border-radius: 20px;
+  border-radius: 6px;
   font-size: 14px;
   font-weight: 700;
   text-transform: uppercase;
@@ -4230,7 +4393,7 @@ body, html {
 }
 
 .vt-risk-card.severity-danger {
-  border-left-color: #b91c1c;
+  border-left-color: #ef4444;
   background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
 }
 
@@ -4270,7 +4433,7 @@ body, html {
 
 .vt-risk-card.severity-safe .vt-risk-label { color: #16a34a; }
 .vt-risk-card.severity-warning .vt-risk-label { color: #d97706; }
-.vt-risk-card.severity-danger .vt-risk-label { color: #b91c1c; }
+.vt-risk-card.severity-danger .vt-risk-label { color: #dc2626; }
 .vt-risk-card.severity-critical .vt-risk-label { color: #b91c1c; }
 
 .vt-risk-score {
@@ -4355,7 +4518,7 @@ body, html {
 
 .vt-info-value.severity-safe { color: #16a34a; }
 .vt-info-value.severity-warning { color: #d97706; }
-.vt-info-value.severity-danger { color: #b91c1c; }
+.vt-info-value.severity-danger { color: #dc2626; }
 .vt-info-value.severity-critical { color: #b91c1c; }
 
 /* 위험 유형 특별 스타일 */
@@ -4720,28 +4883,10 @@ body, html {
 .tab-content .analysis-section {
   margin-top: 0;
   margin-bottom: 0;
-  /* 높이 제한 완전 제거 */
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
 }
 
 .tab-content .section-content {
   padding-top: 24px;
-  /* 높이 제한 완전 제거 */
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-/* 탭 콘텐츠 자체도 높이 제한 제거 */
-.tab-content {
-  height: auto !important;
-  min-height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
 }
 
 @keyframes fadeIn {
