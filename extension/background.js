@@ -1,6 +1,19 @@
 const API_BASE = "http://localhost:8000";  //개발용
 //const API_BASE = "https://knowmal.duckdns.org";  
 
+self.API_BASE = typeof API_BASE !== "undefined" ? API_BASE : self.API_BASE || "http://localhost:8000";
+
+let isContextValid = true;
+
+chrome.runtime.onSuspend.addListener(() => {
+  isContextValid = false;
+  console.log("Service Worker suspended - context invalidated");
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  isContextValid = true;
+  console.log("Service Worker started - context valid");
+});
 
 console.log("[KnowMal] background boot, API_BASE =", self.API_BASE);
 
@@ -18,6 +31,25 @@ console.log("[KnowMal] background boot, API_BASE =", self.API_BASE);
   }
 })();
 
+// Utility function for JSON fetching with timeout
+async function fetchJSON(url, opts = {}, timeoutMs = 20000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    const text = await res.text();
+    let json;
+    try { json = text ? JSON.parse(text) : {}; } catch (e) { json = { raw: text }; }
+    if (!res.ok) {
+      const msg = json?.detail || json?.error || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return json;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "KM_PING") {
     sendResponse({ ok: true, pong: Date.now() });
@@ -25,15 +57,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!isContextValid) {
+    sendResponse({ 
+      ok: false, 
+      error: "Extension context invalidated. Please refresh the page and try again." 
+    });
+    return true;
+  }
+
   if (msg?.type === "maloffice.fetch" && msg.url) {
     (async () => {
       try {
+        if (!isContextValid) {
+          throw new Error("Extension context invalidated during processing");
+        }
+
         const r = await fetch(msg.url, msg.init || {});
         const ct = r.headers.get("content-type") || "";
         let payload = null;
         try {
           payload = ct.includes("application/json") ? await r.json() : await r.text();
-        } catch {
+        } catch (e) {
           payload = null;
         }
         sendResponse({
@@ -47,10 +91,48 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: false, status: 0, error: e?.message || String(e) });
       }
     })();
-    return true; 
+    return true;
+  }
+
+  if (msg?.type === "maloffice.fetchBinary") {
+    (async () => {
+      try {
+        if (!isContextValid) {
+          throw new Error("Extension context invalidated during processing");
+        }
+
+        const { url, init } = msg;
+        const resp = await fetch(url, {
+          method: init?.method || "GET",
+          headers: init?.headers || {},
+          body: init?.body,
+          redirect: "follow",
+          credentials: init?.credentials || "include",
+          referrer: init?.referrer || undefined,
+          referrerPolicy: init?.referrerPolicy || undefined,
+        });
+
+        const buf = await resp.arrayBuffer();
+        sendResponse({
+          ok: resp.ok,
+          status: resp.status,
+          headers: Object.fromEntries(resp.headers.entries()),
+          buffer: buf
+        });
+      } catch (e) {
+        console.error("Background script error:", e);
+        sendResponse({ 
+          ok: false, 
+          error: (e && e.message) || String(e),
+          contextInvalid: e.message && e.message.includes("context invalidated")
+        });
+      }
+    })();
+    return true;
   }
 });
 
+// Gmail OAuth functionality
 (() => {
   const SCOPES = [
     "openid",
@@ -80,7 +162,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         const j = await r.json().catch(() => ({}));
         if (j?.client_id) return j.client_id;
       }
-    } catch {}
+    } catch (e) {}
     throw new Error(
       "GOOGLE_CLIENT_ID 미설정: /auth/google/client 구현 or background_gmail.js에 Client ID 하드코딩 필요"
     );
@@ -177,293 +259,265 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   });
 })();
 
+// Gmail OAuth 확장 메시지 핸들러
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
-    if (msg?.type === "KM_OAUTH_ENSURE") {
-      const extId = chrome.runtime.id;
-      const email = (msg && typeof msg.email === "string" ? msg.email.trim() : "");
+    try {
+      if (msg?.type === "KM_OAUTH_ENSURE") {
+        const extId = chrome.runtime.id;
+        const email = (msg && typeof msg.email === "string" ? msg.email.trim() : "");
 
-      try {
-        let authorized = false;
-        const attempts = 3;
-        for (let i = 0; i < attempts; i++) {
-          const qs = new URLSearchParams({ ext_id: extId });
-          if (email) qs.set("email", email);
-          const r = await fetch(`${self.API_BASE}/auth/google/status?${qs.toString()}`, { credentials: "omit" });
-          console.log("[KnowMal] OAuth status check response:", r.status);
-          if (r.ok) {
-            const j = await r.json();
-            console.log("[KnowMal] OAuth status check result:", j);
-            authorized = !!j?.authorized;
-            if (authorized) break;
-            try { await chrome.storage.local.remove(["KM_OAUTH_READY"]); } catch (_) {}
-          }
-          await new Promise(r => setTimeout(r, 300));
-        }
-
-        if (authorized) {
-          const toSet = email ? { KM_OAUTH_READY: true, KM_OAUTH_EMAIL: email } : { KM_OAUTH_READY: true };
-          await chrome.storage.local.set(toSet);
-          console.log("[KnowMal] OAuth status confirmed, cache saved");
-          sendResponse({ ok: true, authorized: true, authed: true });
-          return;
-        } else {
-          console.log("[KnowMal] OAuth not authorized after retries");
-        }
-      } catch (e) {
-        console.log("[KnowMal] OAuth status check failed:", e);
-      }
-
-      let tabId = null;
-      try {
         try {
-          let finalAuthorized = false;
-          const finalAttempts = 2;
-          for (let i = 0; i < finalAttempts; i++) {
-            const qs2 = new URLSearchParams({ ext_id: extId });
-            if (email) qs2.set("email", email);
-            const r2 = await fetch(`${self.API_BASE}/auth/google/status?${qs2.toString()}`, { credentials: "omit" });
-            if (r2.ok) {
-              const j2 = await r2.json();
-              finalAuthorized = !!j2?.authorized;
-              if (finalAuthorized) break;
+          let authorized = false;
+          const attempts = 3;
+          for (let i = 0; i < attempts; i++) {
+            const qs = new URLSearchParams({ ext_id: extId });
+            if (email) qs.set("email", email);
+            const r = await fetch(`${self.API_BASE}/auth/google/status?${qs.toString()}`, { credentials: "omit" });
+            console.log("[KnowMal] OAuth status check response:", r.status);
+            if (r.ok) {
+              const j = await r.json();
+              console.log("[KnowMal] OAuth status check result:", j);
+              authorized = !!j?.authorized;
+              if (authorized) break;
+              try { await chrome.storage.local.remove(["KM_OAUTH_READY"]); } catch (_) {}
             }
-            await new Promise(r => setTimeout(r, 200));
+            await new Promise(r => setTimeout(r, 300));
           }
-          if (finalAuthorized) {
+
+          if (authorized) {
             const toSet = email ? { KM_OAUTH_READY: true, KM_OAUTH_EMAIL: email } : { KM_OAUTH_READY: true };
             await chrome.storage.local.set(toSet);
-            console.log("[KnowMal] Skip opening OAuth tab: already authorized on final check");
+            console.log("[KnowMal] OAuth status confirmed, cache saved");
             sendResponse({ ok: true, authorized: true, authed: true });
             return;
-          }
-        } catch (_) { /* ignore and proceed to open */ }
-
-        let created = null;
-        try {
-          created = await chrome.tabs.create({
-            url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
-            active: true,
-          });
-        } catch (e1) {
-          console.warn("[KnowMal] tabs.create failed, trying windows.create", e1);
-          try {
-            const win = await chrome.windows.create({
-              url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
-              focused: true,
-              type: "popup",
-              width: 980,
-              height: 740,
-            });
-            if (win && win.tabs && win.tabs.length > 0) created = win.tabs[0];
-          } catch (e2) {
-            console.error("[KnowMal] windows.create also failed", e2);
-          }
-        }
-        if (created && created.id != null) tabId = created.id;
-      } catch (_) { /* noop */ }
-
-      const maxMs = 120_000;
-      const start = Date.now();
-      let authorized = false;
-      
-      while (Date.now() - start < maxMs) {
-        await new Promise(r => setTimeout(r, 1000));
-        try {
-          const qs = new URLSearchParams({ ext_id: extId });
-          if (email) qs.set("email", email);
-          const r = await fetch(`${self.API_BASE}/auth/google/status?${qs.toString()}`, { credentials: "omit" });
-          if (r.ok) {
-            const j = await r.json();
-            if (j?.authorized) {
-              authorized = true;
-              break;
-            }
+          } else {
+            console.log("[KnowMal] OAuth not authorized after retries");
           }
         } catch (e) {
+          console.log("[KnowMal] OAuth status check failed:", e);
         }
-      }
-      
-      if (authorized) {
-        if (tabId != null) {
-          try { await chrome.tabs.remove(tabId); } catch (_) {}
-        }
-        const toSet = email ? { KM_OAUTH_READY: true, KM_OAUTH_EMAIL: email } : { KM_OAUTH_READY: true };
-        await chrome.storage.local.set(toSet);
-        console.log("[KnowMal] OAuth completed, cache saved");
-        sendResponse({ ok: true, authorized: true, authed: true });
-      } else {
+
+        let tabId = null;
         try {
-          if (tabId == null) {
-            console.warn("[KnowMal] OAuth not authorized and no tab tracked; forcing open tab once more");
-            const t = await chrome.tabs.create({
+          try {
+            let finalAuthorized = false;
+            const finalAttempts = 2;
+            for (let i = 0; i < finalAttempts; i++) {
+              const qs2 = new URLSearchParams({ ext_id: extId });
+              if (email) qs2.set("email", email);
+              const r2 = await fetch(`${self.API_BASE}/auth/google/status?${qs2.toString()}`, { credentials: "omit" });
+              if (r2.ok) {
+                const j2 = await r2.json();
+                finalAuthorized = !!j2?.authorized;
+                if (finalAuthorized) break;
+              }
+              await new Promise(r => setTimeout(r, 200));
+            }
+            if (finalAuthorized) {
+              const toSet = email ? { KM_OAUTH_READY: true, KM_OAUTH_EMAIL: email } : { KM_OAUTH_READY: true };
+              await chrome.storage.local.set(toSet);
+              console.log("[KnowMal] Skip opening OAuth tab: already authorized on final check");
+              sendResponse({ ok: true, authorized: true, authed: true });
+              return;
+            }
+          } catch (_) { /* ignore and proceed to open */ }
+
+          let created = null;
+          try {
+            created = await chrome.tabs.create({
               url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
               active: true,
             });
-            tabId = t?.id ?? null;
+          } catch (e1) {
+            console.warn("[KnowMal] tabs.create failed, trying windows.create", e1);
+            try {
+              const win = await chrome.windows.create({
+                url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
+                focused: true,
+                type: "popup",
+                width: 980,
+                height: 740,
+              });
+              if (win && win.tabs && win.tabs.length > 0) created = win.tabs[0];
+            } catch (e2) {
+              console.error("[KnowMal] windows.create also failed", e2);
+            }
           }
-        } catch (_) { /* ignore */ }
-        console.log("[KnowMal] OAuth failed or timeout, clearing cache");
-        await chrome.storage.local.remove(["KM_OAUTH_READY", "KM_OAUTH_EMAIL"]);
-        sendResponse({ ok: false, error: "OAuth 미완료 또는 시간초과" });
-      }
-      return;
-      const { url, init } = msg;
-      const resp = await fetch(url, {
-        method: init?.method || "GET",
-        headers: init?.headers || {},
-        body: init?.body,
-        redirect: "follow",
-        credentials: init?.credentials || "include",
-        referrer: init?.referrer || undefined,
-        referrerPolicy: init?.referrerPolicy || undefined,
-      });
+          if (created && created.id != null) tabId = created.id;
+        } catch (_) { /* noop */ }
 
-      if (msg.type === "maloffice.fetchBinary") {
-        const buf = await resp.arrayBuffer();
-        sendResponse({
-          ok: resp.ok,
-          status: resp.status,
-          headers: Object.fromEntries(resp.headers.entries()),
-          buffer: buf
-        });
-      } else {
-        const text = await resp.text();
-        let data = null;
-        try { data = JSON.parse(text); } catch { /* JSON 아니면 null */ }
-        sendResponse({
-          ok: resp.ok,
-          status: resp.status,
-          headers: Object.fromEntries(resp.headers.entries()),
-          text,
-          json: data
-        });
+        const maxMs = 120_000;
+        const start = Date.now();
+        let authorized = false;
+        
+        while (Date.now() - start < maxMs) {
+          await new Promise(r => setTimeout(r, 1000));
+          try {
+            const qs = new URLSearchParams({ ext_id: extId });
+            if (email) qs.set("email", email);
+            const r = await fetch(`${self.API_BASE}/auth/google/status?${qs.toString()}`, { credentials: "omit" });
+            if (r.ok) {
+              const j = await r.json();
+              if (j?.authorized) {
+                authorized = true;
+                break;
+              }
+            }
+          } catch (e) {
+          }
+        }
+        
+        if (authorized) {
+          if (tabId != null) {
+            try { await chrome.tabs.remove(tabId); } catch (_) {}
+          }
+          const toSet = email ? { KM_OAUTH_READY: true, KM_OAUTH_EMAIL: email } : { KM_OAUTH_READY: true };
+          await chrome.storage.local.set(toSet);
+          console.log("[KnowMal] OAuth completed, cache saved");
+          sendResponse({ ok: true, authorized: true, authed: true });
+        } else {
+          try {
+            if (tabId == null) {
+              console.warn("[KnowMal] OAuth not authorized and no tab tracked; forcing open tab once more");
+              const t = await chrome.tabs.create({
+                url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
+                active: true,
+              });
+              tabId = t?.id ?? null;
+            }
+          } catch (_) { /* ignore */ }
+          console.log("[KnowMal] OAuth failed or timeout, clearing cache");
+          await chrome.storage.local.remove(["KM_OAUTH_READY", "KM_OAUTH_EMAIL"]);
+          sendResponse({ ok: false, error: "OAuth 미완료 또는 시간초과" });
+        }
+        return;
+      }
+
+      if (msg?.type === "KM_OAUTH_ENSURE_FORCE") {
+        const extId = chrome.runtime.id;
+        let tabId = null;
+        try {
+          let created = null;
+          try {
+            created = await chrome.tabs.create({
+              url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
+              active: true,
+            });
+          } catch (e1) {
+            console.warn("[KnowMal] FORCE tabs.create failed, trying windows.create", e1);
+            try {
+              const win = await chrome.windows.create({
+                url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
+                focused: true,
+                type: "popup",
+                width: 980,
+                height: 740,
+              });
+              if (win && win.tabs && win.tabs.length > 0) created = win.tabs[0];
+            } catch (e2) {
+              console.error("[KnowMal] FORCE windows.create also failed", e2);
+            }
+          }
+          if (created && created.id != null) tabId = created.id;
+        } catch (_) { /* noop */ }
+
+        const maxMs = 120_000;
+        const start = Date.now();
+        let authorized = false;
+        while (Date.now() - start < maxMs) {
+          await new Promise(r => setTimeout(r, 1000));
+          try {
+            const r = await fetch(`${self.API_BASE}/auth/google/status?ext_id=${encodeURIComponent(extId)}`, { credentials: "omit" });
+            if (r.ok) {
+              const j = await r.json();
+              if (j?.authorized) { authorized = true; break; }
+            }
+          } catch (e) {}
+        }
+        if (authorized) {
+          if (tabId != null) { try { await chrome.tabs.remove(tabId); } catch (_) {} }
+          await chrome.storage.local.set({ KM_OAUTH_READY: true });
+          sendResponse({ ok: true, authorized: true, authed: true, forced: true });
+        } else {
+          await chrome.storage.local.remove(["KM_OAUTH_READY"]);
+          sendResponse({ ok: false, error: "OAuth 미완료 또는 시간초과", forced: true });
+        }
+        return;
+      }
+
+      if (msg?.type === "KM_OAUTH_STATUS") {
+        const extId = chrome.runtime.id;
+        const email = (msg && typeof msg.email === "string" ? msg.email.trim() : "");
+        try {
+          const qs = new URLSearchParams({ ext_id: extId });
+          if (email) qs.set("email", email);
+          const r = await fetch(`${self.API_BASE}/auth/google/status?${qs.toString()}`, { credentials: "omit" });
+          if (r.ok) {
+            const j = await r.json();
+            sendResponse({ ok: true, authorized: j?.authorized || false, authed: j?.authorized || false, email: j?.email });
+          } else {
+            sendResponse({ ok: true, authorized: false, authed: false });
+          }
+        } catch (e) {
+          sendResponse({ ok: true, authorized: false, authed: false });
+        }
+        return;
+      }
+
+      if (msg?.type === "KM_FETCH") {
+        try {
+          const { url, init } = msg;
+          console.log("[KnowMal] KM_FETCH request:", { url, init });
+          
+          const r = await fetch(url, init);
+          console.log("[KnowMal] KM_FETCH response status:", r.status);
+          
+          const headers = {};
+          r.headers.forEach((v, k) => (headers[k] = v));
+          
+          let json = null;
+          let text = null;
+          
+          try {
+            const ct = r.headers.get("content-type") || "";
+            if (ct.includes("application/json")) {
+              json = await r.json();
+            } else {
+              text = await r.text();
+            }
+          } catch (e) {
+            text = await r.text();
+          }
+          
+          console.log("[KnowMal] KM_FETCH final response:", { 
+            ok: r.ok, 
+            status: r.status, 
+            json,
+            text: text?.substring(0, 200) + "..."
+          });
+          
+          sendResponse({ 
+            ok: r.ok, 
+            status: r.status, 
+            headers, 
+            json,
+            text,
+            body: text
+          });
+        } catch (e) {
+          console.log("[KnowMal] KM_FETCH error:", e);
+          sendResponse({ ok: false, error: String(e) });
+        }
+        return;
       }
     } catch (e) {
       console.error("Background script error:", e);
       sendResponse({ 
         ok: false, 
         error: (e && e.message) || String(e),
-        contextInvalid: e.message.includes("context invalidated")
+        contextInvalid: e.message && e.message.includes("context invalidated")
       });
-    }
-
-    if (msg?.type === "KM_OAUTH_ENSURE_FORCE") {
-      const extId = chrome.runtime.id;
-      let tabId = null;
-      try {
-        let created = null;
-        try {
-          created = await chrome.tabs.create({
-            url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
-            active: true,
-          });
-        } catch (e1) {
-          console.warn("[KnowMal] FORCE tabs.create failed, trying windows.create", e1);
-          try {
-            const win = await chrome.windows.create({
-              url: `${self.API_BASE}/auth/google/start?ext_id=${encodeURIComponent(extId)}`,
-              focused: true,
-              type: "popup",
-              width: 980,
-              height: 740,
-            });
-            if (win && win.tabs && win.tabs.length > 0) created = win.tabs[0];
-          } catch (e2) {
-            console.error("[KnowMal] FORCE windows.create also failed", e2);
-          }
-        }
-        if (created && created.id != null) tabId = created.id;
-      } catch (_) { /* noop */ }
-
-      const maxMs = 120_000;
-      const start = Date.now();
-      let authorized = false;
-      while (Date.now() - start < maxMs) {
-        await new Promise(r => setTimeout(r, 1000));
-        try {
-          const r = await fetch(`${self.API_BASE}/auth/google/status?ext_id=${encodeURIComponent(extId)}`, { credentials: "omit" });
-          if (r.ok) {
-            const j = await r.json();
-            if (j?.authorized) { authorized = true; break; }
-          }
-        } catch {}
-      }
-      if (authorized) {
-        if (tabId != null) { try { await chrome.tabs.remove(tabId); } catch (_) {} }
-        await chrome.storage.local.set({ KM_OAUTH_READY: true });
-        sendResponse({ ok: true, authorized: true, authed: true, forced: true });
-      } else {
-        await chrome.storage.local.remove(["KM_OAUTH_READY"]);
-        sendResponse({ ok: false, error: "OAuth 미완료 또는 시간초과", forced: true });
-      }
-      return;
-    }
-
-    if (msg?.type === "KM_OAUTH_STATUS") {
-      const extId = chrome.runtime.id;
-      const email = (msg && typeof msg.email === "string" ? msg.email.trim() : "");
-      try {
-        const qs = new URLSearchParams({ ext_id: extId });
-        if (email) qs.set("email", email);
-        const r = await fetch(`${self.API_BASE}/auth/google/status?${qs.toString()}`, { credentials: "omit" });
-        if (r.ok) {
-          const j = await r.json();
-          sendResponse({ ok: true, authorized: j?.authorized || false, authed: j?.authorized || false, email: j?.email });
-        } else {
-          sendResponse({ ok: true, authorized: false, authed: false });
-        }
-      } catch (e) {
-        sendResponse({ ok: true, authorized: false, authed: false });
-      }
-      return;
-    }
-
-    if (msg?.type === "KM_FETCH") {
-      try {
-        const { url, init } = msg;
-        console.log("[KnowMal] KM_FETCH request:", { url, init });
-        
-        const r = await fetch(url, init);
-        console.log("[KnowMal] KM_FETCH response status:", r.status);
-        
-        const headers = {};
-        r.headers.forEach((v, k) => (headers[k] = v));
-        
-        let json = null;
-        let text = null;
-        
-        try {
-          const ct = r.headers.get("content-type") || "";
-          if (ct.includes("application/json")) {
-            json = await r.json();
-          } else {
-            text = await r.text();
-          }
-        } catch (e) {
-      text = await r.text();
-        }
-      
-        console.log("[KnowMal] KM_FETCH final response:", { 
-          ok: r.ok, 
-          status: r.status, 
-          json,
-          text: text?.substring(0, 200) + "..."
-        });
-        
-        sendResponse({ 
-          ok: r.ok, 
-          status: r.status, 
-          headers, 
-          json,
-          text,
-          body: text
-        });
-      } catch (e) {
-        console.log("[KnowMal] KM_FETCH error:", e);
-        sendResponse({ ok: false, error: String(e) });
-      }
-      return;
     }
   })();
   return true; 

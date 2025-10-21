@@ -1,6 +1,20 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import List
+import os
+from pathlib import Path
+
+def load_env_file():
+    env_file = Path(".env.dev")
+    if env_file.exists():
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+
+load_env_file()
 
 class Settings(BaseSettings):
     APP_NAME: str = "MalOffice API"

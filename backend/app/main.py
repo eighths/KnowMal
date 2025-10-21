@@ -26,6 +26,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(scan_router)
+app.include_router(share_router)
+app.include_router(google_oauth_router)
+app.include_router(gmail_router)
 app.include_router(tistory_router)
 
 @app.on_event("startup")
@@ -70,12 +74,6 @@ def render_share_report(request: Request, share_id: str):
         template_name,
         {"request": request, "share_id": share_id, "data": data, "ttl": ttl, "created_at": created_at}
     )
-
-app.include_router(scan_router)
-app.include_router(share_router)
-
-app.include_router(google_oauth_router)
-app.include_router(gmail_router)
 
 @app.get("/auth/success")
 def auth_success():
