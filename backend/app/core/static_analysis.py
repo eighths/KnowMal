@@ -68,6 +68,13 @@ def is_archive_file(file_bytes: bytes, filename: str = "") -> bool:
     mime = sniff_mime(file_bytes=file_bytes)
     print(f"[DEBUG] is_archive_file 검사 - 파일: {filename}, MIME: {mime}")
     
+    is_office = (filename.lower().endswith(('.docx', '.xlsx', '.pptx', '.odt', '.ods', '.odp')) or
+                'officedocument' in mime or 'openxml' in mime)
+    
+    if is_office:
+        print(f"[DEBUG] Office 파일로 인식됨, 압축 파일 분석 건너뜀: {filename}")
+        return False
+    
     archive_mimes = [
         'application/zip', 'application/x-zip-compressed',
         'application/x-rar-compressed', 'application/vnd.rar',
