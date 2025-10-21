@@ -52,7 +52,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       if (msg.type === "KM_OAUTH_STATUS" || msg.type === "KM_OAUTH_ENSURE") {
-        return; 
+        return sendResponse({ ok: false, error: "OAuth not implemented in background_gmail.js" }); 
       }
 
       return sendResponse({ ok: false, error: "unknown type " + msg.type });

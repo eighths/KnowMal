@@ -9,79 +9,296 @@
     s.id = STYLE_ID;
     s.textContent = `
 :root{
-  --mo-bg:#f8fafc;--mo-card:#fff;--mo-muted:#64748b;--mo-text:#0f172a;
-  --mo-border:#e2e8f0;--mo-shadow:0 4px 20px rgba(0,0,0,.08);--mo-radius:16px;
+  --mo-bg: #f8fafc;
+  --mo-card: #ffffff;
+  --mo-muted: #64748b;
+  --mo-text: #0f172a;
+  --mo-border: #e2e8f0;
+  --mo-primary: #3b82f6;
+  --mo-primary-600: #2563eb;
+  --mo-shadow: 0 4px 20px rgba(0,0,0,.08);
+  --mo-radius: 16px;
 }
-#mo-overlay{position:fixed;inset:0;z-index:2147483647;display:none;
-  background:rgba(0,0,0,.36);backdrop-filter:blur(2px);
-  align-items:center;justify-content:center;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial;}
-.mo-card{width:min(520px,92vw);background:var(--mo-card);
-  border:1px solid var(--mo-border);border-radius:var(--mo-radius);box-shadow:var(--mo-shadow);}
-.mo-head{display:flex;align-items:center;gap:12px;padding:20px 20px 0 20px;}
-.mo-avatar{width:32px;height:32px;border-radius:10px;
-  background:radial-gradient(circle at 30% 30%,#93c5fd,#2563eb);
-  box-shadow:0 4px 16px rgba(37,99,235,.3);}
-.mo-titlebox{flex:1}.mo-title{font-weight:700;font-size:16px;color:#0f172a;margin:0;}
-.mo-sub{color:var(--mo-muted);font-size:13px;margin-top:4px;line-height:1.4;}
-.mo-statusline{display:flex;align-items:center;gap:12px;margin:20px 20px 0 20px;flex-direction:row-reverse;}
-.mo-badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;
-  font-size:11px;background:#f3f4f6;border:1px solid var(--mo-border);color:#374151;font-weight:800;}
-.mo-badge.dot::before{content:"";width:8px;height:8px;border-radius:999px;background:#9ca3af;margin-right:6px;}
-.mo-badge.ok::before{background:#16a34a;}
-.mo-badge.err::before{background:#dc2626;}
-.mo-msg{font-size:13px;color:#0f172a;margin:8px 20px 0 20px;}
-.mo-progress{height:10px;margin:0 20px 0 0;background:#f3f4f6;border-radius:10px;overflow:hidden;
-  border:1px solid #e5e7eb;box-shadow:inset 0 1px 3px rgba(0,0,0,.1);}
-.mo-progress>i{display:block;height:100%;width:0%;
-  background:linear-gradient(90deg,#34d399,#06b6d4);border-radius:10px;transition:width .3s ease;}
-.mo-actions{display:flex;gap:16px;justify-content:center;padding:20px;}
-.mo-btn{flex:1;padding:12px 0;border-radius:10px;font-weight:600;font-size:14px;border:none;cursor:pointer;transition:all .2s;}
-.mo-btn:disabled{background:#f3f4f6;color:#9ca3af;cursor:not-allowed;}
-.mo-btn.primary{background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%);color:#fff;box-shadow:0 2px 8px rgba(59,130,246,.3);}
-.mo-btn.primary:hover:not(:disabled){box-shadow:0 4px 12px rgba(59,130,246,.4);}
-.mo-btn.secondary{background:transparent;color:#3b82f6;border:2px solid #3b82f6;}
-.mo-btn.secondary:hover:not(:disabled){background:#eff6ff;color:#2563eb;border:2px solid #3b82f6;box-shadow:0 2px 6px rgba(59,130,246,.2);}
+#mo-overlay{
+  position:fixed; inset:0; z-index:2147483647; display:none;
+  background: rgba(0,0,0,.36); backdrop-filter: blur(2px);
+  align-items:center; justify-content:center;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial;
+}
+.mo-card{
+  width:min(720px, 96vw); background:var(--mo-card);
+  border:1px solid var(--mo-border); border-radius: var(--mo-radius);
+  box-shadow: var(--mo-shadow);
+  min-height: 320px;
+}
+.mo-head{
+  display:flex; align-items:center; gap:14px;
+  padding:24px 24px 0 24px;
+}
+.mo-logo{ width:32px; height:32px; border-radius:10px; object-fit:contain; box-shadow: 0 4px 16px rgba(0,0,0,.1); border:1px solid #cbd5e1; background:#fff }
+.mo-titlebox{flex:1}
+.mo-title{
+  font-weight: 700; font-size: 18px; color: var(--mo-text);
+  margin: 0;
+}
+.mo-sub{ 
+  color: var(--mo-muted); 
+  font-size: 14px; 
+  margin-top: 4px; 
+  line-height: 1.4;
+}
+
+.mo-steps{ display:flex; align-items:center; gap:22px; margin: 32px 24px 0 24px; }
+.mo-step{ display:flex; align-items:center; gap:14px; font-size:16px; color:#9ca3af; }
+.mo-step i{ width:16px; height:16px; border-radius:999px; background:#e5e7eb; display:inline-block; box-shadow: inset 0 0 0 1px #cbd5e1 }
+#mo-step-wait.active{ color:#374151 !important; }
+#mo-step-wait.active i{ background:#4b5563 !important; }
+#mo-step-run.active{ color:#1e40af !important; }
+#mo-step-run.active i{ background:#3b82f6 !important; }
+#mo-step-done.active{ color:#15803d !important; }
+#mo-step-done.active i{ background:#16a34a !important; }
+
+.mo-msg{ 
+  font-size:14px; 
+  color: #1e40af;
+  margin: 20px 24px 0 24px;
+  padding: 16px 0;
+  background: rgba(239, 246, 255, 0.8);
+  border: 2px dashed #bfdbfe;
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.mo-msg.processing{ 
+  color: #1e40af;
+  background: rgba(239, 246, 255, 0.8);
+  border-color: #bfdbfe;
+}
+
+.mo-actions{
+  display:flex; gap:16px; justify-content:center; 
+  padding: 32px 24px 28px 24px;
+}
+.mo-btn{
+  flex:1; padding:12px 0; border-radius:10px; font-weight:600; font-size:14px; 
+  border:none; cursor:pointer; transition:all .2s;
+}
+.mo-btn:disabled{
+  background:#f3f4f6; color:#9ca3af; cursor:not-allowed;
+}
+.mo-btn.primary{
+  background:linear-gradient(135deg,#3b82f6 0%,#1d4ed8 100%); color:#fff; 
+  box-shadow:0 2px 8px rgba(59,130,246,.3);
+}
+.mo-btn.primary:hover:not(:disabled){
+  box-shadow:0 4px 12px rgba(59,130,246,.4);
+}
+.mo-btn.secondary{
+  background:transparent; color:#3b82f6; border:2px solid #3b82f6;
+}
+.mo-btn.secondary:hover:not(:disabled) {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 2px solid #3b82f6;
+  box-shadow: 0 2px 6px rgba(59,130,246,.2);
+}
+.mo-btn.download{
+  background: #e5e7eb;
+  color: #111827;
+  border: 2px solid #e5e7eb;
+}
+.mo-btn.download:hover:not(:disabled){
+  background: #e2e8f0;
+  border-color: #e2e8f0;
+}
+
+.mo-result{ 
+  margin: 24px 24px 0 24px; 
+  padding: 20px; 
+  border-radius: 12px; 
+  border: 2px dashed; 
+  display: none; 
+  text-align: center;
+}
+.mo-result.safe{ 
+  border-color: #34d399; 
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); 
+}
+.mo-result.danger{ 
+  border-color: #f87171; 
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); 
+}
+.mo-result .mo-result-content{
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  text-align: left;
+}
+.mo-result .mo-siren-icon{
+  font-size: 32px;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.mo-result .mo-text-block{
+  flex: 1;
+  text-align: center;
+}
+.mo-result .mo-main-title{ 
+  font-size: 18px; 
+  font-weight: 800; 
+  margin: 0 0 8px 0; 
+  color: #dc2626;
+}
+.mo-result .mo-sub-title{ 
+  font-size: 15px; 
+  font-weight: 600; 
+  margin: 0 0 12px 0; 
+  color: #991b1b;
+}
+.mo-result .mo-desc-line{ 
+  font-size: 13px; 
+  color: #7f1d1d; 
+  margin: 0 0 4px 0; 
+  line-height: 1.4;
+}
+.mo-result.safe .mo-main-title{ color: #16a34a; }
+.mo-result.safe .mo-sub-title{ color: #15803d; }
+.mo-result.safe .mo-desc-line{ color: #166534; }
+
+#mo-step-done.active.status-safe{ color:#15803d !important; }
+#mo-step-done.active.status-safe i{ background:#16a34a !important; }
+#mo-step-done.active.status-danger{ color:#b91c1c !important; }
+#mo-step-done.active.status-danger i{ background:#dc2626 !important; }
 `;
     document.head.appendChild(s);
   }
 
-  let $ov,$prog,$badge,$msg,$btnOpen;
+  let $ov,$msg,$btnOpen,$btnClose,$btnDownload,$result;
+  let currentAttachment = null; // 현재 첨부 파일 정보 저장
   function ensureOverlay(){
     if($ov) return;
     injectStyles();
     $ov=document.createElement("div");
     $ov.id="mo-overlay";
+    const logoUrl = chrome.runtime.getURL("images/KnowMal_logo.png");
     $ov.innerHTML=`
     <div class="mo-card" role="dialog" aria-modal="true">
       <div class="mo-head">
-        <div class="mo-avatar"></div>
+        <img class="mo-logo" src="${logoUrl}" alt="KnowMal" />
         <div class="mo-titlebox">
           <div class="mo-title">KnowMal</div>
           <div class="mo-sub">문서 실행 전 악성 행위 예측 서비스</div>
         </div>
       </div>
-      <div class="mo-statusline">
-        <span class="mo-badge dot" id="mo-badge">대기</span>
-        <div class="mo-progress"><i id="mo-prog"></i></div>
+      <div class="mo-msg" id="mo-msg">파일의 악성 행위를 검사 중입니다.</div>
+      <div id="mo-result" class="mo-result" aria-live="polite"></div>
+      <div class="mo-steps" aria-hidden="true">
+        <span class="mo-step" id="mo-step-wait"><i></i>대기</span>
+        <span class="mo-step" id="mo-step-run"><i></i>진행</span>
+        <span class="mo-step" id="mo-step-done"><i></i>완료</span>
       </div>
-      <div class="mo-msg" id="mo-msg">준비 중…</div>
       <div class="mo-actions">
-        <button class="mo-btn secondary" id="mo-close">창 닫기</button>
-        <button class="mo-btn primary" id="mo-open" disabled>리포트 확인</button>
+        <button class="mo-btn primary" id="mo-open" disabled>상세 결과 확인</button>
+        <button class="mo-btn download" id="mo-download" disabled>파일 다운로드</button>
+        <button class="mo-btn secondary" id="mo-close">닫기</button>
       </div>
     </div>`;
     document.body.appendChild($ov);
-    $prog=$ov.querySelector("#mo-prog");
-    $badge=$ov.querySelector("#mo-badge");
     $msg=$ov.querySelector("#mo-msg");
     $btnOpen=$ov.querySelector("#mo-open");
-    $ov.querySelector("#mo-close").onclick=()=>($ov.style.display="none");
+    $btnClose=$ov.querySelector("#mo-close");
+    $btnDownload=$ov.querySelector("#mo-download");
+    $result=$ov.querySelector("#mo-result");
+    $btnClose.onclick=()=>{
+      $ov.style.display="none";
+      resetModalState();
+    };
   }
-  function showOverlay(){ ensureOverlay(); $ov.style.display="flex"; badge("진행"); msg("서버 준비 중…"); prog(8); disableOpen(); }
-  const msg = (t)=>($msg.textContent=t);
-  const prog = (p)=>($prog.style.width=`${Math.max(0,Math.min(100,p))}%`);
-  const badge = (t,ok=false,err=false)=>{ $badge.textContent=t; $badge.className=`mo-badge ${ok?"ok":err?"err":"dot"}`; };
+  function showOverlay(){ 
+    ensureOverlay(); 
+    $ov.style.display="flex"; 
+    resetModalState(); // 모든 상태 초기화
+    setStep("진행"); 
+    setMsg("파일의 악성 행위를 검사 중입니다."); 
+  }
+  
+  function setMsg(text, className = "processing"){
+    $msg.textContent = text;
+    $msg.className = `mo-msg ${className}`;
+  }
+  
+  function setStep(state){
+    const steps = [
+      ["대기", document.getElementById("mo-step-wait")],
+      ["진행", document.getElementById("mo-step-run")],
+      ["완료", document.getElementById("mo-step-done")]
+    ];
+    for (const [name, el] of steps){
+      if (!el) continue;
+      el.classList.toggle("active", name === state);
+    }
+  }
+  
+  function setResult(kind){
+    if (!kind){ 
+      $result.style.display = "none"; 
+      $result.className = "mo-result"; 
+      $result.innerHTML = ""; 
+      return; 
+    }
+    const isSafe = kind === "safe";
+    $result.style.display = "block";
+    $result.className = "mo-result " + (isSafe ? "safe" : "danger");
+    if (isSafe){
+      $result.innerHTML = `
+        <div class="mo-result-content">
+          <div class="mo-siren-icon">✅</div>
+          <div class="mo-text-block">
+            <div class="mo-main-title">정상: 안전한 파일</div>
+            <div class="mo-sub-title">악성코드를 포함하지 않는 파일입니다.</div>
+          </div>
+        </div>`;
+    } else {
+      $result.innerHTML = `
+        <div class="mo-result-content">
+          <div class="mo-siren-icon">🚨</div>
+          <div class="mo-text-block">
+            <div class="mo-main-title">위험: 파일을 열지 마세요</div>
+            <div class="mo-sub-title">악성코드가 탐지되었습니다</div>
+            <div class="mo-desc-line">자세한 검사 결과를 보기 위해선</div>
+            <div class="mo-desc-line">상세 결과 확인 버튼을 클릭하세요.</div>
+          </div>
+        </div>`;
+    }
+  }
+
+  function resetModalState(){
+    if ($result) {
+      $result.style.display = "none";
+      $result.className = "mo-result";
+      $result.innerHTML = "";
+    }
+    if ($msg) {
+      $msg.style.display = "block";
+      setMsg("파일의 악성 행위를 검사 중입니다.", "processing");
+    }
+    setStep("대기");
+    if ($btnOpen) {
+      $btnOpen.disabled = true;
+      $btnOpen.textContent = "상세 결과 확인";
+      $btnOpen.onclick = null;
+    }
+    disableDownload();
+    currentAttachment = null;
+    try{
+      const doneEl = document.getElementById("mo-step-done");
+      if (doneEl){
+        doneEl.classList.remove("status-safe","status-danger");
+      }
+    }catch(_){}
+  }
+
   const enableOpen = (url)=>{ 
     console.log("[KnowMal] enableOpen called with URL:", url);
     $btnOpen.disabled=false; 
@@ -91,6 +308,72 @@
     }; 
   };
   const disableOpen = ()=>{ $btnOpen.disabled=true; $btnOpen.onclick=null; };
+  
+  const disableDownload = ()=>{ 
+    if($btnDownload) {
+      $btnDownload.disabled=true; 
+      $btnDownload.onclick=null; 
+    }
+  };
+  
+  const enableDownload = (attachment)=>{ 
+    if($btnDownload && attachment) {
+      $btnDownload.disabled=false; 
+      $btnDownload.onclick=()=>{
+        console.log("[KnowMal] Downloading file:", attachment.filename);
+        downloadGmailAttachment(attachment);
+      }; 
+    }
+  };
+  
+  async function downloadGmailAttachment(attachment) {
+    try {
+      console.log("[KnowMal] Starting download for:", attachment);
+      
+      // Gmail 첨부 파일 다운로드를 위한 URL 생성
+      const downloadUrl = attachment.url;
+      if (!downloadUrl) {
+        console.error("[KnowMal] No download URL available");
+        return;
+      }
+      
+      // 새 탭에서 다운로드 URL 열기
+      const downloadLink = document.createElement('a');
+      downloadLink.href = downloadUrl;
+      downloadLink.download = attachment.filename;
+      downloadLink.target = '_blank';
+      downloadLink.style.display = 'none';
+      
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      console.log("[KnowMal] Download initiated for:", attachment.filename);
+    } catch (error) {
+      console.error("[KnowMal] Download failed:", error);
+    }
+  }
+
+  function setDone(reportUrl, attachment, status = "safe"){
+    console.log("[KnowMal] setDone 호출됨 - status:", status);
+    $msg.style.display = "none";
+    setStep("완료");
+    try{
+      const doneEl = document.getElementById("mo-step-done");
+      if (doneEl){
+        doneEl.classList.remove("status-safe","status-danger");
+        if (status === "safe") doneEl.classList.add("status-safe");
+        else if (status === "danger") doneEl.classList.add("status-danger");
+      }
+    }catch(_){}
+    
+    // 첨부 파일 정보 저장
+    currentAttachment = attachment;
+    
+    setResult(status);
+    enableOpen(reportUrl);
+    enableDownload(attachment);
+  }
 
   function bgSend(type, payload={}){
     return new Promise((resolve,reject)=>{
@@ -98,6 +381,14 @@
         reject(new Error("Chrome extension context not available"));
         return;
       }
+      
+      // OAuth 관련 메시지는 직접 처리
+      if (type === "KM_OAUTH_STATUS" || type === "KM_OAUTH_ENSURE" || type === "KM_OAUTH_ENSURE_FORCE") {
+        // Gmail에서는 OAuth가 필요하지 않으므로 항상 성공으로 처리
+        resolve({ ok: true, authed: true, authorized: true });
+        return;
+      }
+      
       chrome.runtime.sendMessage({type, ...payload}, (resp)=>{
         if(chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
         resolve(resp);
@@ -279,7 +570,7 @@
       return true;
     }
     
-    msg("Google 동의 창에서 인증을 완료하세요…"); prog(35);
+    setMsg("Google 동의 창에서 인증을 완료하세요…"); setStep("진행");
 
     const race = await Promise.race([
       (async()=>{ 
@@ -312,7 +603,7 @@
   }
 
   async function runScan(att){
-    msg("Gmail 첨부 파일 분석 요청…"); prog(60);
+    setMsg("Gmail 첨부 파일 분석 요청…"); setStep("진행");
     const ids=parseIds(att.url);
 
     const message_id = att.message_id || ids.message_id || ids.thread_id || getFallbackMessageId();
@@ -350,7 +641,7 @@
             reportUrl = reportUrl.replace('https://localhost', 'http://localhost');
           }
           console.log("[KnowMal] Using report URL:", reportUrl);
-          msg("검사 완료"); prog(100); badge("완료", true); enableOpen(reportUrl);
+          setDone(reportUrl, att);
           return;
         }
       }
@@ -375,7 +666,7 @@
             if (reportUrl2.includes('https://localhost')) {
               reportUrl2 = reportUrl2.replace('https://localhost', 'http://localhost');
             }
-            msg("검사 완료"); prog(100); badge("완료", true); enableOpen(reportUrl2);
+            setDone(reportUrl2, att);
             return;
           }
         }
@@ -392,7 +683,7 @@
     const reportUrl = r.report_url || r.reportUrl || r.url || (r.data && (r.data.report_url||r.data.url));
     if(!reportUrl){
       if(r.task_id){
-        msg("분석 중…"); prog(80);
+        setMsg("분석 중…"); setStep("진행");
         const deadline=Date.now()+120000;
         while(Date.now()<deadline){
           await new Promise(r=>setTimeout(r,1200));
@@ -406,7 +697,7 @@
   }
 
   async function startFlow(att){
-    showOverlay(); badge("진행"); msg("Google OAuth 상태 확인…"); prog(20); disableOpen();
+    showOverlay(); setStep("진행"); setMsg("Google OAuth 상태 확인…"); disableOpen();
     try{
       const pageEmail = getActiveGmailEmail();
       let serverEmail = "";
@@ -422,11 +713,11 @@
       } catch(_){ /* 일반 ensure로 진행 */ }
 
       await ensureOAuth();
-      msg("인증 확인 완료. 분석을 시작합니다…"); prog(45);
+      setMsg("인증 확인 완료. 분석을 시작합니다…"); setStep("진행");
       await runScan(att);
     }catch(e){
       console.warn("[KnowMal] flow error", e);
-      badge("오류", false, true); msg(e?.message || String(e)); prog(100); disableOpen();
+      setStep("완료"); setMsg(e?.message || String(e)); disableOpen();
     }
   }
 
