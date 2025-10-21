@@ -1,6 +1,6 @@
 (() => {
   const API_BASE = "http://localhost:8000";
-  const OFFICE_RE = /\.(docx?|xlsx?|pptx?|html?|json)$/i;
+  const OFFICE_RE = /\.(docx?|xlsx?|pptx?|html?|json|zip|rar|7z|tar|gz|bz2|pdf|hwp|exe|dll|msi|bat|cmd|lnk|scr|iso|img|bin)$/i;
   const STYLE_ID = "maloffice-style-v2";
 
   function injectStyles() {
@@ -436,15 +436,18 @@
       console.log("[KnowMal] Found message_id from href:", message_id);
       
       const label=(a.getAttribute("aria-label")||a.textContent||"").trim();
-      const m=label.match(/[^\/\\]+?\.(docx?|xlsx?|pptx?)/i);
+      const m=label.match(/[^\/\\]+?\.(docx?|xlsx?|pptx?|zip|rar|7z|tar|gz|bz2|pdf|hwp|exe|dll|msi|bat|cmd|lnk|scr|iso|img|bin)/i);
       const filename=m?m[0]:"document.bin";
       return { url:a.href, filename, message_id };
     }catch(e){ return null; }
   }
   function findAttachment(target){
+    console.log("[KnowMal] findAttachment called on:", target);
     let n=target;
     for(let i=0;i<8 && n;i++){ 
+      console.log("[KnowMal] Checking element:", n, "iteration:", i);
       const info=parseDownloadUrlAttr(n); 
+      console.log("[KnowMal] parseDownloadUrlAttr result:", info);
       if(info && OFFICE_RE.test(info.filename)) {
         console.log("[KnowMal] Found attachment via download_url:", info);
         return info; 
@@ -452,21 +455,29 @@
       n=n.parentElement; 
     }
     const a=target.closest?.("a");
+    console.log("[KnowMal] Found closest link:", a);
     if(a){
+      console.log("[KnowMal] Link href:", a.href);
+      console.log("[KnowMal] Link text:", a.textContent);
+      console.log("[KnowMal] Link aria-label:", a.getAttribute("aria-label"));
+      
       const info2=extractFromHref(a); 
+      console.log("[KnowMal] extractFromHref result:", info2);
       if(info2 && OFFICE_RE.test(info2.filename)) {
         console.log("[KnowMal] Found attachment via href:", info2);
         return info2;
       }
-      const txt=(a.textContent||a.getAttribute("aria-label")||"").trim().toLowerCase();
-      if(OFFICE_RE.test(txt)) {
+      const txt=(a.textContent||a.getAttribute("aria-label")||"").trim();
+      const txtLower = txt.toLowerCase();
+      if(OFFICE_RE.test(txtLower)) {
         let message_id = "";
         try {
           const u = new URL(a.href, location.origin);
           message_id = u.searchParams.get("th") || "";
         } catch (e) {
         }
-        const result = { url:a.href, filename: txt.match(OFFICE_RE)?.[0] || "document.bin", message_id };
+        const match = txt.match(OFFICE_RE);
+        const result = { url:a.href, filename: match ? match[0] : "document.bin", message_id };
         console.log("[KnowMal] Found attachment via text match:", result);
         return result;
       }
@@ -636,12 +647,13 @@
       
       if (response.ok) {
         let reportUrl = r_json.report_url || r_json.reportUrl || r_json.url;
+        let status = r_json.status || "safe";
         if (reportUrl) {
           if (reportUrl.includes('https://localhost')) {
             reportUrl = reportUrl.replace('https://localhost', 'http://localhost');
           }
-          console.log("[KnowMal] Using report URL:", reportUrl);
-          setDone(reportUrl, att);
+          console.log("[KnowMal] Using report URL:", reportUrl, "Status:", status);
+          setDone(reportUrl, att, status);
           return;
         }
       }
@@ -662,11 +674,12 @@
         if (response2.ok){
           const r2 = await response2.json();
           let reportUrl2 = r2.report_url || r2.reportUrl || r2.url;
+          let status2 = r2.status || "safe";
           if (reportUrl2){
             if (reportUrl2.includes('https://localhost')) {
               reportUrl2 = reportUrl2.replace('https://localhost', 'http://localhost');
             }
-            setDone(reportUrl2, att);
+            setDone(reportUrl2, att, status2);
             return;
           }
         }
@@ -722,7 +735,12 @@
   }
 
   function maybeHandle(target, ev){
+    console.log("[KnowMal] maybeHandle called on:", target);
+    console.log("[KnowMal] Target text:", target.textContent || target.getAttribute("aria-label") || "");
+    console.log("[KnowMal] Target href:", target.href || target.closest("a")?.href || "");
+    
     const info=findAttachment(target);
+    console.log("[KnowMal] findAttachment result:", info);
     if(!info) return false;
     ev?.preventDefault?.(); ev?.stopPropagation?.(); ev?.stopImmediatePropagation?.();
     startFlow(info);
