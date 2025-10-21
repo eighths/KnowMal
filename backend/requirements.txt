@@ -20,6 +20,8 @@ pefile==2023.2.7
 # python-magic>=0.4.27       # linux/server
 python-magic-bin>=0.4.14   # windows
 jsonschema>=4.23.0
+rarfile>=4.0
+py7zr>=0.20.0
 
 pandas>=2.3.3
 xgboost>=3.0.5

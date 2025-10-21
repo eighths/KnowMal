@@ -8,7 +8,7 @@ import requests, hashlib, html, re, io, zipfile, json
 
 from app.db import get_db
 from app.config import get_settings
-from app.core.static_analysis import analyze_bytes, analyze_zip_bytes
+from app.core.static_analysis import analyze_bytes
 from app.cache.redis_client import get_redis
 from app.cache.keys import file_data_key
 
@@ -169,51 +169,39 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
     analysis_result = None
     if raw_for_excerpt and len(raw_for_excerpt) > 0:
         try:
-            def _looks_like_zip_bytes(b: bytes) -> bool:
-                sig = b[:4]
-                return sig.startswith(b"PK\x03\x04") or sig.startswith(b"PK\x05\x06") or sig.startswith(b"PK\x07\x08") or b[:2] == b"PK"
-
-            is_zip = (
-                filename.lower().endswith('.zip') or
-                (mime or '').lower().startswith('application/zip') or
-                (mime or '').lower().endswith('zip') or
-                _looks_like_zip_bytes(raw_for_excerpt)
+            # 모든 파일에 대해 analyze_bytes() 사용 - ZIP 파일은 내부적으로 처리됨
+            analysis_result = analyze_bytes(
+                file_bytes=raw_for_excerpt,
+                filename=filename,
+                ttl_sec=3600,  # 1시간 캐시
+                use_cache=True,
+                include_virustotal=True
             )
 
-            if is_zip:
-                # ZIP 아카이브: 내부 파일 일괄 분석 (비번 없음 또는 'pass')
-                analysis_result = analyze_zip_bytes(
-                    raw_for_excerpt,
-                    filename=filename,
-                    ttl_sec=3600,
-                    use_cache=True,
-                    include_virustotal=True,
-                    passwords=[None, 'pass']
-                )
-
-                # 각 내부 파일에 대해 AI 예측 부여
-                try:
-                    from app.services.ensemble_model_service import get_ensemble_model_service
-                    ens = get_ensemble_model_service()
-                    if ens.model_loaded:
+            # AI 예측 추가 (내부 파일들에 대해서도 처리됨)
+            try:
+                from app.services.ensemble_model_service import get_ensemble_model_service
+                ens = get_ensemble_model_service()
+                if ens.model_loaded:
+                    # 일반 파일의 경우
+                    if 'embedded_files' not in analysis_result:
+                        try:
+                            analysis_result['ai_prediction'] = ens.predict_malware_type(analysis_result)
+                        except Exception:
+                            pass
+                    else:
+                        # 아카이브 파일의 경우 - 내부 파일들에 AI 예측 추가
                         for item in analysis_result.get('embedded_files', []) or []:
                             rep = item.get('report')
                             if rep:
                                 try:
-                                    item['ai_prediction'] = ens.predict_malware_type(rep)
+                                    ai_prediction = ens.predict_malware_type(rep)
+                                    if ai_prediction:
+                                        rep['ai_prediction'] = ai_prediction
                                 except Exception:
-                                    item['ai_prediction'] = None
-                except Exception:
-                    pass
-            else:
-                # 일반 파일 분석
-                analysis_result = analyze_bytes(
-                    file_bytes=raw_for_excerpt,
-                    filename=filename,
-                    ttl_sec=3600,  # 1시간 캐시
-                    use_cache=True,
-                    include_virustotal=True
-                )
+                                    rep['ai_prediction'] = None
+            except Exception:
+                pass
 
             # 분석 결과를 Redis에 저장 (ZIP인 경우에도 동일 키에 저장)
             r = get_redis()

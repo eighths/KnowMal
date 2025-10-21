@@ -75,6 +75,14 @@ def create_share(
                 if ai_prediction:
                     pass
 
+    try:
+        if (not virustotal_result) and isinstance(analysis_report, dict):
+            embedded_vt = analysis_report.get("virustotal")
+            if embedded_vt:
+                virustotal_result = embedded_vt
+    except Exception:
+        pass
+
     payload = {
         "file_id": row.id,
         "filename": row.filename,
@@ -87,6 +95,25 @@ def create_share(
         "virustotal": virustotal_result,  
         "created_at": int(time.time()),
     }
+
+    try:
+        if isinstance(virustotal_result, dict):
+            ss = virustotal_result.get('scan_summary') or {}
+        if isinstance(analysis_report, dict) and analysis_report.get('virustotal'):
+            ss2 = analysis_report['virustotal'].get('scan_summary') or {}
+    except Exception:
+        pass
+
+    try:
+        if isinstance(analysis_report, dict) and analysis_report.get("embedded_files"):
+            first_item = (analysis_report.get("embedded_files") or [])[:1]
+            if first_item:
+                first = first_item[0]
+                payload["filename"] = first.get("filename") or payload.get("filename")
+                payload["size_bytes"] = first.get("size_bytes") or payload.get("size_bytes")
+                payload["sha256"] = first.get("sha256") or payload.get("sha256")
+    except Exception:
+        pass
 
     r = get_redis()
     key = share_key(share_id)
@@ -102,11 +129,33 @@ def create_share(
 
         raise HTTPException(status_code=500, detail="BASE_URL not configured")
 
-    report_url = f"{base_url}/r/{share_id}"
+    status = "unknown"
+    try:
+        if isinstance(ai_prediction, dict):
+            prediction_label = ai_prediction.get("prediction", "").lower()
+            if "malicious" in prediction_label or "malware" in prediction_label:
+                status = "malicious"
+            elif "benign" in prediction_label or "safe" in prediction_label:
+                status = "safe"
+        
+        if status == "unknown" and isinstance(virustotal_result, dict):
+            scan_summary = virustotal_result.get("scan_summary", {})
+            malicious_count = scan_summary.get("malicious", 0)
+            total_count = scan_summary.get("total", 0)
+            
+            if malicious_count > 0:
+                status = "malicious"
+            elif total_count > 0:
+                status = "safe"
+    except Exception as e:
+        status = "unknown"
+
+    report_url = f"{base_url}/r/{share_id}?status={status}"
     return {
         "ok": True,
         "share_id": share_id,
         "report_url": report_url,
+        "status": status,
         "ttl_seconds": ttl,
     }
 
@@ -129,12 +178,37 @@ def load_report_data(share_id: str):
 @router.get("/view/{share_id}")
 def view_share(request: Request, share_id: str):
     data, ttl, created_at = load_report_data(share_id)
+    vt_context = None
+    try:
+        if isinstance(data, dict):
+            vt_context = data.get("virustotal") or (
+                (data.get("analysis_report") or {}).get("virustotal")
+                if isinstance(data.get("analysis_report"), dict)
+                else None
+            )
+    except Exception:
+        vt_context = None
+
+    is_archive = False
+    try:
+        if isinstance(data, dict):
+            analysis_report = data.get("analysis_report")
+            if isinstance(analysis_report, dict):
+                file_info = analysis_report.get("file")
+                if isinstance(file_info, dict):
+                    is_archive = file_info.get("is_archive", False)
+    except Exception:
+        is_archive = False
+
+    template_name = "report.html" if is_archive else "report_unzip.html"
+    
     return templates.TemplateResponse(
-        "report.html",
+        template_name,
         {
             "request": request,
             "share_id": share_id,
             "data": data,
+            "virustotal": vt_context, 
             "ttl": ttl,
             "created_at": created_at,
         },

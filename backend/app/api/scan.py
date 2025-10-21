@@ -8,7 +8,7 @@ from app.db import SessionLocal
 from app.db import schema
 from app.db.models import FileRecord
 from app.db.schema import FileOut
-from app.core.static_analysis import sniff_mime, extract_excerpt, analyze_bytes, analyze_file, get_cached_report, analyze_zip_bytes
+from app.core.static_analysis import sniff_mime, extract_excerpt, analyze_bytes, analyze_file, get_cached_report
 from app.cache.redis_client import get_redis
 from app.cache.keys import file_data_key
 from app.config import get_settings
@@ -56,63 +56,42 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
     db.commit()
 
     try:
-        def _looks_like_zip_bytes(b: bytes) -> bool:
-            sig = b[:4]
-            return sig.startswith(b"PK\x03\x04") or sig.startswith(b"PK\x05\x06") or sig.startswith(b"PK\x07\x08") or b[:2] == b"PK"
-
-        is_zip = (
-            filename.lower().endswith('.zip') or
-            (mime or '').lower().startswith('application/zip') or
-            (mime or '').lower().endswith('zip') or
-            _looks_like_zip_bytes(file_bytes)
+        report = analyze_bytes(
+            file_bytes=file_bytes, 
+            filename=filename, 
+            ttl_sec=settings.SHARE_TTL_SECONDS, 
+            use_cache=True,
+            include_virustotal=True
         )
 
-        if is_zip:
-            report = analyze_zip_bytes(
-                zip_bytes=file_bytes,
-                filename=filename,
-                ttl_sec=settings.SHARE_TTL_SECONDS,
-                use_cache=True,
-                include_virustotal=True,
-                passwords=[None, 'pass']
-            )
-
-            ensemble_model_service = get_ensemble_model_service()
-            if ensemble_model_service.model_loaded:
+        ensemble_model_service = get_ensemble_model_service()
+        if ensemble_model_service.model_loaded and report:
+            if 'embedded_files' not in report:
+                try:
+                    ai_prediction = ensemble_model_service.predict_malware_type(report)
+                    if ai_prediction:
+                        report['ai_prediction'] = ai_prediction
+                except Exception:
+                    pass
+            else:
                 for item in report.get('embedded_files', []) or []:
                     rep = item.get('report')
                     if rep:
                         try:
-                            item['ai_prediction'] = ensemble_model_service.predict_malware_type(rep)
+                            ai_prediction = ensemble_model_service.predict_malware_type(rep)
+                            if ai_prediction:
+                                rep['ai_prediction'] = ai_prediction
                         except Exception:
-                            item['ai_prediction'] = None
+                            rep['ai_prediction'] = None
 
-            cache_data = {
-                "filename": filename,
-                "mime_type": mime,
-                "size_bytes": size,
-                "sha256": sha256,
-                "file_id": rec.id,
-                "report": report
-            }
-        else:
-            report = analyze_bytes(file_bytes, filename, ttl_sec=settings.SHARE_TTL_SECONDS, use_cache=True)
-
-            ensemble_model_service = get_ensemble_model_service()
-            ai_prediction = None
-            if ensemble_model_service.model_loaded and report:
-                ai_prediction = ensemble_model_service.predict_malware_type(report)
-
-            cache_data = {
-                "filename": filename,
-                "mime_type": mime,
-                "size_bytes": size,
-                "sha256": sha256,
-                "file_id": rec.id,
-                "report": report
-            }
-            if ai_prediction:
-                cache_data["ai_prediction"] = ai_prediction
+        cache_data = {
+            "filename": filename,
+            "mime_type": mime,
+            "size_bytes": size,
+            "sha256": sha256,
+            "file_id": rec.id,
+            "report": report
+        }
 
         redis_client = get_redis()
         file_cache_key = file_data_key(sha256)
@@ -121,7 +100,7 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
     except Exception as e:
         background_tasks.add_task(analyze_bytes, file_bytes, filename)
 
-    return JSONResponse({
+    resp = {
         "ok": True,
         "id": rec.id,
         "filename": rec.filename,
@@ -129,7 +108,13 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
         "size_bytes": rec.size_bytes,
         "excerpt_preview": (rec.content_excerpt or "")[:300],
         "sha256": sha256
-    })
+    }
+    try:
+        vt = (report or {}).get('virustotal') if isinstance(report, dict) else None
+        ss = (vt or {}).get('scan_summary') or {}
+    except Exception:
+        pass
+    return JSONResponse(resp)
 
 @router.get("/recent", response_model=list[FileOut])
 def recent(db: Session = Depends(get_db)):
@@ -207,3 +192,18 @@ def reload_models():
             "message": "Legacy AI model reloaded successfully" if ai_success else "Failed to reload legacy AI model"
         }
     }
+
+@router.post("/test-zip-detection")
+async def test_zip_detection_endpoint(file: UploadFile = File(...)):
+    try:
+        file_bytes = await file.read()
+        result = test_zip_detection(file_bytes, file.filename)
+        return JSONResponse({
+            "ok": True,
+            "test_result": result
+        })
+    except Exception as e:
+        return JSONResponse({
+            "ok": False,
+            "error": str(e)
+        }, status_code=500)

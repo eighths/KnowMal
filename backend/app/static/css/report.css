@@ -14,6 +14,23 @@ body {
   line-height: 1.6;
 }
 
+.text-danger { color: #dc2626 !important; }
+.text-warning { color: #f59e0b !important; }
+.text-safe { color: #059669 !important; }
+.risk-percentage { font-weight: 700; font-size: 15px; }
+
+.chip { padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+.chip-danger { background: #fee2e2; color: #dc2626; }
+.chip-normal { background: #dcfce7; color: #166534; }
+
+.vt-mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.vt-box { border-radius: 6px; padding: 12px; text-align: center; border: 1px solid #e2e8f0; background: #ffffff; }
+.vt-box.danger { background: #fee2e2; border-color: #fca5a5; }
+.vt-box.warning { background: #fffbeb; border-color: #fbbf24; }
+.vt-box.safe { background: #f0fdf4; border-color: #bbf7d0; }
+.vt-number { font-size: 20px; font-weight: 700; }
+.vt-sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
+
 .card {
   border: 1px solid #e5e7eb;
   border-radius: 12px;

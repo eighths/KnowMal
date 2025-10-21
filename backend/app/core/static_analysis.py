@@ -1,9 +1,20 @@
 from __future__ import annotations
-import hashlib, json, os, io, magic, tempfile
-import zipfile
+import hashlib, json, os, io, magic, tempfile, zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+
+try:
+    import rarfile
+    RARFILE_AVAILABLE = True
+except ImportError:
+    RARFILE_AVAILABLE = False
+
+try:
+    import py7zr
+    PY7ZR_AVAILABLE = True
+except ImportError:
+    PY7ZR_AVAILABLE = False
 
 from app.core.static_analyzer.parsers.ole_parser import OLEParser
 from app.external.virustotal import get_virustotal_client
@@ -51,6 +62,233 @@ def extract_excerpt(path: str = None, mime: str = None, max_len: int = 4000, fil
         except Exception:
             pass
     return excerpt
+
+
+def is_archive_file(file_bytes: bytes, filename: str = "") -> bool:
+    mime = sniff_mime(file_bytes=file_bytes)
+    
+    archive_mimes = [
+        'application/zip', 'application/x-zip-compressed',
+        'application/x-rar-compressed', 'application/vnd.rar',
+        'application/x-7z-compressed', 'application/x-tar',
+        'application/gzip', 'application/x-gzip'
+    ]
+    
+    if any(mime.startswith(am) for am in archive_mimes):
+        return True
+    
+    if filename:
+        archive_extensions = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2']
+        if any(filename.lower().endswith(ext) for ext in archive_extensions):
+            return True
+    
+    if file_bytes:
+        # ZIP 시그니처
+        if file_bytes.startswith(b'PK\x03\x04') or file_bytes.startswith(b'PK\x05\x06') or file_bytes.startswith(b'PK\x07\x08'):
+            return True
+        # RAR 시그니처
+        if file_bytes.startswith(b'Rar!\x1a\x07\x00') or file_bytes.startswith(b'Rar!\x1a\x07\x01\x00'):
+            return True
+        # 7z 시그니처
+        if file_bytes.startswith(b'7z\xbc\xaf\x27\x1c'):
+            return True
+    
+    return False
+
+
+def extract_archive_files(file_bytes: bytes, filename: str = "", password: str = "pass") -> List[Dict[str, Any]]:
+    extracted_files = []
+    
+    try:
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_file.write(file_bytes)
+            temp_file.flush()
+            temp_path = temp_file.name
+        
+        try:
+            if zipfile.is_zipfile(temp_path):
+                with zipfile.ZipFile(temp_path, 'r') as zf:
+                    for file_info in zf.filelist:
+                        if file_info.is_dir():
+                            continue
+                        
+                        try:
+                            try:
+                                file_data = zf.read(file_info.filename, pwd=password.encode('utf-8'))
+                            except (RuntimeError, zipfile.BadZipFile):
+                                try:
+                                    file_data = zf.read(file_info.filename)
+                                except Exception:
+                                    continue
+                            
+                            file_report = analyze_bytes(
+                                file_bytes=file_data,
+                                filename=file_info.filename,
+                                use_cache=True,
+                                include_virustotal=True
+                            )
+                            
+                            extracted_files.append({
+                                'filename': file_info.filename,
+                                'size_bytes': len(file_data),
+                                'compressed_size': file_info.compress_size,
+                                'report': file_report
+                            })
+                            
+                        except Exception as e:
+                            continue
+            
+            elif RARFILE_AVAILABLE and rarfile.is_rarfile(temp_path):
+                try:
+                    with rarfile.RarFile(temp_path, 'r') as rf:
+                        rf.setpassword(password)
+                        for file_info in rf.infolist():
+                            if file_info.is_dir():
+                                continue
+                            
+                            try:
+                                file_data = rf.read(file_info.filename)
+                                
+                                file_report = analyze_bytes(
+                                    file_bytes=file_data,
+                                    filename=file_info.filename,
+                                    use_cache=True,
+                                    include_virustotal=True
+                                )
+                                
+                                extracted_files.append({
+                                    'filename': file_info.filename,
+                                    'size_bytes': len(file_data),
+                                    'compressed_size': file_info.compress_size,
+                                    'report': file_report
+                                })
+                                
+                            except Exception as e:
+                                continue
+                except Exception as e:
+                    print(f"RAR 파일 처리 오류: {e}")
+            
+            elif PY7ZR_AVAILABLE and py7zr.is_7zfile(temp_path):
+                try:
+                    with py7zr.SevenZipFile(temp_path, mode="r", password=password) as szf:
+                        for file_info in szf.list():
+                            if file_info.is_directory:
+                                continue
+                            
+                            try:
+                                extracted_data = szf.read([file_info.filename])
+                                file_data = extracted_data[file_info.filename].read()
+                                
+                                file_report = analyze_bytes(
+                                    file_bytes=file_data,
+                                    filename=file_info.filename,
+                                    use_cache=True,
+                                    include_virustotal=True
+                                )
+                                
+                                extracted_files.append({
+                                    'filename': file_info.filename,
+                                    'size_bytes': len(file_data),
+                                    'compressed_size': file_info.compressed,
+                                    'report': file_report
+                                })
+                                
+                            except Exception as e:
+                                continue
+                except Exception as e:
+                    print(f"7z 파일 처리 오류: {e}")
+        
+        finally:
+            # 임시 파일 정리
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+    
+    except Exception as e:
+        print(f"압축 파일 처리 중 오류: {e}")
+    
+    return extracted_files
+
+
+def _get_archive_type(file_bytes: bytes, filename: str = "") -> str:
+    if zipfile.is_zipfile(io.BytesIO(file_bytes)):
+        return "zip"
+    elif file_bytes.startswith(b'Rar!'):
+        return "rar"
+    elif file_bytes.startswith(b'7z\xbc\xaf\x27\x1c'):
+        return "7z"
+    elif filename.lower().endswith('.tar'):
+        return "tar"
+    elif filename.lower().endswith('.gz'):
+        return "gzip"
+    else:
+        return "unknown"
+
+
+def _count_malicious_files(extracted_files: List[Dict[str, Any]]) -> int:
+    count = 0
+    for file_info in extracted_files:
+        report = file_info.get('report', {})
+        
+        vt_result = report.get('virustotal', {})
+        if vt_result.get('available') and vt_result.get('scan_summary', {}).get('malicious', 0) > 0:
+            count += 1
+            continue
+        
+        ai_prediction = report.get('ai_prediction', {})
+        if ai_prediction and ai_prediction.get('ai_analysis', {}).get('predicted_types'):
+            predicted_types = ai_prediction['ai_analysis']['predicted_types']
+            if any(t != 'Normal' for t in predicted_types):
+                count += 1
+    
+    return count
+
+
+def _calculate_archive_risk_score(extracted_files: List[Dict[str, Any]]) -> float:
+    if not extracted_files:
+        return 0.0
+    
+    total_files = len(extracted_files)
+    malicious_files = _count_malicious_files(extracted_files)
+    
+    base_risk = malicious_files / total_files if total_files > 0 else 0.0
+    
+    high_risk_extensions = ['.exe', '.scr', '.bat', '.cmd', '.com', '.pif', '.vbs', '.js']
+    suspicious_files = 0
+    
+    for file_info in extracted_files:
+        filename = file_info.get('filename', '').lower()
+        if any(filename.endswith(ext) for ext in high_risk_extensions):
+            suspicious_files += 1
+    
+    suspicious_ratio = suspicious_files / total_files if total_files > 0 else 0.0
+    
+    final_risk = min(1.0, base_risk + (suspicious_ratio * 0.3))
+    
+    return final_risk
+
+
+def _get_most_dangerous_vt_result(extracted_files: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    max_detection_rate = 0.0
+    most_dangerous_vt = None
+    
+    for file_info in extracted_files:
+        report = file_info.get('report', {})
+        vt_result = report.get('virustotal', {})
+        
+        if vt_result.get('available') and vt_result.get('scan_summary'):
+            scan_summary = vt_result['scan_summary']
+            malicious = scan_summary.get('malicious', 0)
+            total = scan_summary.get('total', 0)
+            
+            if total > 0:
+                detection_rate = malicious / total
+                if detection_rate > max_detection_rate:
+                    max_detection_rate = detection_rate
+                    most_dangerous_vt = vt_result
+    
+    return most_dangerous_vt
 
 
 def _normalize_report(features: Dict[str, Any], file_path: str, file_bytes: bytes = None) -> Dict[str, Any]:
@@ -130,6 +368,51 @@ def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: i
             return json.loads(cached)
 
     mime = sniff_mime(file_bytes=file_bytes)
+    
+    if is_archive_file(file_bytes, filename):
+        extracted_files = extract_archive_files(file_bytes, filename)
+        
+        report = {
+            "schema_version": "1.0",
+            "report_id": filename,
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "analyzer": {"name": "ArchiveAnalyzer"},
+            "file": {
+                "filename": filename,
+                "extension": Path(filename).suffix.lower(),
+                "size_bytes": len(file_bytes),
+                "mime_type": mime,
+                "hash": {"sha256": sha256},
+                "is_archive": True
+            },
+            "features": {
+                "structure": {
+                    "format": "archive",
+                    "container_type": _get_archive_type(file_bytes, filename),
+                    "files_count": len(extracted_files),
+                    "malicious_files_count": _count_malicious_files(extracted_files)
+                },
+                "macros": {"has_vba": False, "vba_present": False},
+                "strings": {},
+                "apis": {},
+                "obfuscation": {},
+                "network_indicators": {},
+                "security_indicators": {}
+            },
+            "risk_assessment": {
+                "overall_risk_score": _calculate_archive_risk_score(extracted_files)
+            },
+            "x_extensions": {},
+            "embedded_files": extracted_files
+        }
+        
+        if include_virustotal and extracted_files:
+            most_dangerous_vt = _get_most_dangerous_vt_result(extracted_files)
+            if most_dangerous_vt:
+                report["virustotal"] = most_dangerous_vt
+        
+        r.setex(k, ttl_sec, json.dumps(report, ensure_ascii=False))
+        return report
     
     is_office_file = ("msword" in mime or mime.endswith("ole") or "olecf" in mime or 
                       filename.lower().endswith(('.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx')))
@@ -266,78 +549,6 @@ def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: i
     
     r.setex(k, ttl_sec, json.dumps(report, ensure_ascii=False))
     return report
-
-
-def analyze_zip_bytes(
-    zip_bytes: bytes,
-    *,
-    filename: str = "archive.zip",
-    ttl_sec: int = 3600,
-    use_cache: bool = True,
-    include_virustotal: bool = True,
-    passwords: list[str | None] | None = None,
-    max_entries: int = 50,
-    max_each_size_bytes: int = 25 * 1024 * 1024,
-) -> dict:
-
-    if passwords is None:
-        passwords = [None, "pass"]
-
-    archive_size = len(zip_bytes)
-    embedded_files: list[dict] = []
-
-    last_err: Exception | None = None
-    for pwd in passwords:
-        try:
-            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-                if pwd is not None:
-                    try:
-                        zf.setpassword(pwd.encode("utf-8"))
-                    except Exception:
-                        pass
-
-                for i, info in enumerate(zf.infolist()):
-                    if i >= max_entries:
-                        break
-                    if info.is_dir():
-                        continue
-                    if info.file_size <= 0 or info.file_size > max_each_size_bytes:
-                        continue
-                    try:
-                        with zf.open(info, "r") as f:
-                            inner_bytes = f.read()
-                        inner_name = info.filename
-                        inner_report = analyze_bytes(
-                            inner_bytes,
-                            filename=inner_name,
-                            ttl_sec=ttl_sec,
-                            use_cache=use_cache,
-                            include_virustotal=include_virustotal,
-                        )
-                        embedded_files.append({
-                            "filename": inner_name,
-                            "size_bytes": len(inner_bytes),
-                            "sha256": hashlib.sha256(inner_bytes).hexdigest(),
-                            "report": inner_report,
-                        })
-                    except Exception as e:
-                        continue
-
-            last_err = None
-            break
-        except Exception as e:
-            last_err = e
-            continue
-
-    archive_report = {
-        "schema_version": "1.0",
-        "archive": {
-            "filename": filename,
-            "size_bytes": archive_size,
-        },
-        "embedded_files": embedded_files,
-    }
-    return archive_report
 
 def _get_virustotal_analysis(sha256: str) -> Optional[Dict[str, Any]]:
     from app.config import get_settings

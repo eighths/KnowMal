@@ -43,8 +43,22 @@ def report_alias(share_id: str):
 @app.get("/r/{share_id}", response_class=HTMLResponse, tags=["share"])
 def render_share_report(request: Request, share_id: str):
     data, ttl, created_at = load_report_data(share_id)
+    
+    is_archive = False
+    try:
+        if isinstance(data, dict):
+            analysis_report = data.get("analysis_report")
+            if isinstance(analysis_report, dict):
+                file_info = analysis_report.get("file")
+                if isinstance(file_info, dict):
+                    is_archive = file_info.get("is_archive", False)
+    except Exception:
+        is_archive = False
+
+    template_name = "report.html" if is_archive else "report_unzip.html"
+    
     return templates.TemplateResponse(
-        "report.html",
+        template_name,
         {"request": request, "share_id": share_id, "data": data, "ttl": ttl, "created_at": created_at}
     )
 
