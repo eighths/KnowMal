@@ -511,6 +511,49 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         }
         return;
       }
+
+      if (msg?.type === "KM_DOWNLOAD_FILE") {
+        try {
+          const { message_id, filename, account_email } = msg;
+          console.log("[KnowMal] KM_DOWNLOAD_FILE request:", { message_id, filename, account_email });
+          
+          const extId = chrome.runtime.id;
+          const downloadUrl = `${self.API_BASE}/gmail/download/${encodeURIComponent(message_id)}?filename=${encodeURIComponent(filename)}`;
+          
+          const headers = {
+            "X-KM-Ext-Id": extId,
+            "X-KM-Account-Email": account_email || undefined
+          };
+          
+          const r = await fetch(downloadUrl, {
+            method: 'GET',
+            headers: headers
+          });
+          
+          console.log("[KnowMal] KM_DOWNLOAD_FILE response status:", r.status);
+          
+          if (!r.ok) {
+            const errorText = await r.text().catch(() => "");
+            throw new Error(`Download failed: ${r.status} ${errorText}`);
+          }
+          
+          // 파일을 Blob으로 받아서 다운로드 URL 생성
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          
+          console.log("[KnowMal] KM_DOWNLOAD_FILE completed:", filename);
+          
+          sendResponse({ 
+            ok: true, 
+            download_url: url,
+            filename: filename
+          });
+        } catch (e) {
+          console.log("[KnowMal] KM_DOWNLOAD_FILE error:", e);
+          sendResponse({ ok: false, error: String(e) });
+        }
+        return;
+      }
     } catch (e) {
       console.error("Background script error:", e);
       sendResponse({ 

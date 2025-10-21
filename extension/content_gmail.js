@@ -330,27 +330,159 @@
     try {
       console.log("[KnowMal] Starting download for:", attachment);
       
-      // Gmail 첨부 파일 다운로드를 위한 URL 생성
-      const downloadUrl = attachment.url;
-      if (!downloadUrl) {
-        console.error("[KnowMal] No download URL available");
+      const messageId = attachment.message_id;
+      const filename = attachment.filename;
+      
+      if (!messageId) {
+        console.error("[KnowMal] No message_id available");
         return;
       }
       
-      // 새 탭에서 다운로드 URL 열기
+      const downloadResult = await bgSend("KM_DOWNLOAD_FILE", {
+        message_id: messageId,
+        filename: filename,
+        account_email: getActiveGmailEmail()
+      });
+      
+      if (!downloadResult?.ok) {
+        throw new Error(downloadResult?.error || "다운로드 실패");
+      }
+      
+      if (!downloadResult.download_url) {
+        throw new Error("다운로드 URL을 받지 못했습니다");
+      }
+      
+      console.log("[KnowMal] Fetching from URL:", downloadResult.download_url);
+      const response = await fetch(downloadResult.download_url, {
+        method: 'GET',
+        headers: downloadResult.headers || {}
+      });
+      
+      console.log("[KnowMal] Fetch response:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      if (!response.ok) {
+        throw new Error(`다운로드 실패: ${response.status} ${response.statusText}`);
+      }
+      
+      let finalFilename = filename;
+      const contentDisposition = response.headers.get('Content-Disposition');
+      if (contentDisposition) {
+        console.log("[KnowMal] Content-Disposition header:", contentDisposition);
+        const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/);
+        if (utf8Match) {
+          try {
+            finalFilename = decodeURIComponent(utf8Match[1]);
+            console.log("[KnowMal] Extracted UTF-8 filename:", finalFilename);
+          } catch (e) {
+            console.warn("[KnowMal] Failed to decode UTF-8 filename:", e);
+          }
+        }
+      }
+      
+      console.log("[KnowMal] Creating array buffer from response...");
+      const arrayBuffer = await response.arrayBuffer();
+      console.log("[KnowMal] ArrayBuffer created:", {
+        size: arrayBuffer.byteLength
+      });
+      
+      const blob = new Blob([arrayBuffer], { type: response.headers.get('content-type') || 'application/octet-stream' });
+      console.log("[KnowMal] Blob created:", {
+        size: blob.size,
+        type: blob.type
+      });
+      
+      const url = URL.createObjectURL(blob);
+      console.log("[KnowMal] Blob URL created:", url);
+      
       const downloadLink = document.createElement('a');
-      downloadLink.href = downloadUrl;
-      downloadLink.download = attachment.filename;
+      downloadLink.href = url;
+      downloadLink.download = finalFilename;
       downloadLink.target = '_blank';
       downloadLink.style.display = 'none';
       
+      console.log("[KnowMal] Download link created:", {
+        href: url,
+        download: finalFilename,
+        originalFilename: attachment.filename,
+        extractedFromHeader: finalFilename !== filename,
+        blobSize: blob.size,
+        blobType: blob.type
+      });
+      
+      console.log("[KnowMal] Download link attributes:", {
+        href: downloadLink.href,
+        download: downloadLink.download,
+        target: downloadLink.target
+      });
+      
+      if (downloadLink.download !== finalFilename) {
+        console.warn("[KnowMal] Download attribute mismatch:", {
+          expected: finalFilename,
+          actual: downloadLink.download
+        });
+        downloadLink.download = finalFilename;
+      }
+      
       document.body.appendChild(downloadLink);
-      downloadLink.click();
+      console.log("[KnowMal] Clicking download link...");
+      
+      downloadLink.addEventListener('click', (e) => {
+        console.log("[KnowMal] Download link clicked:", {
+          href: e.target.href,
+          download: e.target.download
+        });
+      });
+      
+      try {
+        if (typeof chrome !== 'undefined' && chrome.downloads) {
+          console.log("[KnowMal] Trying Chrome downloads API...");
+          
+          const reader = new FileReader();
+          reader.onload = async function() {
+            const base64Data = reader.result.split(',')[1];
+            const dataUrl = `data:${blob.type};base64,${base64Data}`;
+            
+            try {
+              await chrome.downloads.download({
+                url: dataUrl,
+                filename: finalFilename,
+                saveAs: false
+              });
+              console.log("[KnowMal] Chrome downloads API success:", finalFilename);
+            } catch (e) {
+              console.warn("[KnowMal] Chrome downloads API failed, falling back to link click:", e);
+              downloadLink.click();
+            }
+          };
+          reader.readAsDataURL(blob);
+        } else {
+          console.log("[KnowMal] Chrome downloads API not available, using link click");
+          downloadLink.click();
+        }
+      } catch (e) {
+        console.warn("[KnowMal] Chrome downloads API error, using link click:", e);
+        downloadLink.click();
+      }
+      
       document.body.removeChild(downloadLink);
       
-      console.log("[KnowMal] Download initiated for:", attachment.filename);
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+          console.log("[KnowMal] Blob URL revoked:", url);
+        } catch (e) {
+          console.warn("[KnowMal] URL revoke failed:", e);
+        }
+      }, 5000);
+      
+      console.log("[KnowMal] Download completed for:", filename);
     } catch (error) {
       console.error("[KnowMal] Download failed:", error);
+      alert(`파일 다운로드에 실패했습니다: ${error.message}`);
     }
   }
 
@@ -367,12 +499,14 @@
       }
     }catch(_){}
     
-    // 첨부 파일 정보 저장
-    currentAttachment = attachment;
+    currentAttachment = {
+      ...attachment,
+      message_id: attachment.message_id || getFallbackMessageId()
+    };
     
     setResult(status);
     enableOpen(reportUrl);
-    enableDownload(attachment);
+    enableDownload(currentAttachment);
   }
 
   function bgSend(type, payload={}){
@@ -382,9 +516,7 @@
         return;
       }
       
-      // OAuth 관련 메시지는 직접 처리
       if (type === "KM_OAUTH_STATUS" || type === "KM_OAUTH_ENSURE" || type === "KM_OAUTH_ENSURE_FORCE") {
-        // Gmail에서는 OAuth가 필요하지 않으므로 항상 성공으로 처리
         resolve({ ok: true, authed: true, authorized: true });
         return;
       }
@@ -482,6 +614,22 @@
         return result;
       }
     }
+    
+    const attachmentArea = target.closest('[data-attachment-id], [data-attachment-name]');
+    if (attachmentArea) {
+      const attachmentId = attachmentArea.getAttribute('data-attachment-id');
+      const attachmentName = attachmentArea.getAttribute('data-attachment-name');
+      if (attachmentId && attachmentName) {
+        const result = {
+          url: target.href || target.closest('a')?.href || '',
+          filename: attachmentName,
+          message_id: getFallbackMessageId()
+        };
+        console.log("[KnowMal] Found attachment via data attributes:", result);
+        return result;
+      }
+    }
+    
     return null;
   }
   const filenameOnly=(n)=>{ try{ const u=new URL(n, location.origin); return decodeURIComponent(u.pathname.split("/").pop()||n);}catch(e){ return n; } };
@@ -653,7 +801,12 @@
             reportUrl = reportUrl.replace('https://localhost', 'http://localhost');
           }
           console.log("[KnowMal] Using report URL:", reportUrl, "Status:", status);
-          setDone(reportUrl, att, status);
+          // 첨부파일 정보에 message_id 추가
+          const attachmentWithId = {
+            ...att,
+            message_id: message_id
+          };
+          setDone(reportUrl, attachmentWithId, status);
           return;
         }
       }
@@ -679,7 +832,11 @@
             if (reportUrl2.includes('https://localhost')) {
               reportUrl2 = reportUrl2.replace('https://localhost', 'http://localhost');
             }
-            setDone(reportUrl2, att, status2);
+            const attachmentWithId2 = {
+              ...att,
+              message_id: message_id
+            };
+            setDone(reportUrl2, attachmentWithId2, status2);
             return;
           }
         }
@@ -701,11 +858,25 @@
         while(Date.now()<deadline){
           await new Promise(r=>setTimeout(r,1200));
           const s=await bgFetch(`/gmail/scan/status?task_id=${encodeURIComponent(r.task_id)}`, { method:"GET" });
-          if((s.status==="done"||s.ok) && (s.report_url||s.url)) return s.report_url||s.url;
+          if((s.status==="done"||s.ok) && (s.report_url||s.url)) {
+            const finalUrl = s.report_url||s.url;
+            const attachmentWithId = {
+              ...att,
+              message_id: message_id
+            };
+            setDone(finalUrl, attachmentWithId, "safe");
+            return finalUrl;
+          }
         }
       }
       throw new Error("리포트 URL 미수신");
     }
+    
+    const attachmentWithId = {
+      ...att,
+      message_id: message_id
+    };
+    setDone(reportUrl, attachmentWithId, "safe");
     return reportUrl;
   }
 
