@@ -5,10 +5,60 @@
   <title>KnowMal - 문서 악성 코드 탐지 리포트</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
-  <link rel="stylesheet" href="/static/css/report.css">
+  <link rel="stylesheet" href="/static/css/report.css?v=11">
 </head>
 <body>
   {% if data.analysis_report or data.virustotal or data.ai_prediction %}
+  
+  {# === 압축 파일 여부 및 내부 파일 확인 === #}
+  {% set analysis_report = data.analysis_report or data.report %}
+  {% set is_archive = false %}
+  {% set embedded_files = [] %}
+  {% if analysis_report and analysis_report.file %}
+    {% set is_archive = analysis_report.file.is_archive or false %}
+    {% set embedded_files = analysis_report.embedded_files or [] %}
+  {% endif %}
+  
+  {# === Gemini 설명 전역 폴백 === #}
+  {% set gx = None %}
+  
+  {# 압축 파일인 경우, 가장 위험한 내부 파일의 gemini_explanation 찾기 #}
+  {% if is_archive and embedded_files and embedded_files|length > 0 %}
+    {% set most_dangerous_gx = namespace(value=None, threat_count=0) %}
+    {% for item in embedded_files %}
+      {% set rep = item.get('report') %}
+      {% if rep and rep.gemini_explanation %}
+        {% if rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
+          {% set threat_count = 0 %}
+          {% for t in rep.ai_prediction.ai_analysis.predicted_types %}
+            {% if t != 'Normal' %}
+              {% set threat_count = threat_count + 1 %}
+            {% endif %}
+          {% endfor %}
+          {% if threat_count > most_dangerous_gx.threat_count %}
+            {% set most_dangerous_gx.value = rep.gemini_explanation %}
+            {% set most_dangerous_gx.threat_count = threat_count %}
+          {% elif most_dangerous_gx.threat_count == 0 and most_dangerous_gx.value is none %}
+            {# Normal 파일이어도 gemini_explanation이 있으면 사용 #}
+            {% set most_dangerous_gx.value = rep.gemini_explanation %}
+          {% endif %}
+        {% elif most_dangerous_gx.value is none %}
+          {# ai_prediction이 없어도 gemini_explanation이 있으면 사용 #}
+          {% set most_dangerous_gx.value = rep.gemini_explanation %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+    {% set gx = most_dangerous_gx.value %}
+  {% else %}
+    {# 일반 파일인 경우 #}
+    {% set gx = (
+        data.gemini_explanation
+        or (data.report.gemini_explanation if data.report else None)
+        or (data.report.report.gemini_explanation if (data.report and data.report.report) else None)
+        or (data.analysis_report.gemini_explanation if data.analysis_report else None)
+        or (data.cache_data.gemini_explanation if data.cache_data else None)
+    ) %}
+  {% endif %}
   
       <!-- 통합 파일 정보 카드 -->
       <div class="unified-file-card">
@@ -300,6 +350,39 @@
       {% endif %}
         </div>
         </div>
+        
+        <!-- Gemini 종합 설명 -->
+        {# ==== Gemini 종합 설명 (요약/대처) ==== #}
+        {% if gx %}
+          {% if gx is mapping %}
+            <div class="gemini-summary-section">
+              <div class="summary-header">
+                <span class="summary-title">AI 보안 분석 종합 설명</span>
+              </div>
+
+              <div class="summary-content">
+                {{ gx.summary }}
+              </div>
+
+              <div class="action-content">
+                <ul>
+                  {% if gx.actions and gx.actions.immediate %}<li>즉시 조치: {{ gx.actions.immediate }}</li>{% endif %}
+                  {% if gx.actions and gx.actions.investigate %}<li>조사: {{ gx.actions.investigate }}</li>{% endif %}
+                  {% if gx.actions and gx.actions.deep %}<li>심층 대응: {{ gx.actions.deep }}</li>{% endif %}
+                </ul>
+              </div>
+            </div>
+          {% else %}
+            <div class="gemini-summary-section">
+              <div class="summary-header">
+                <span class="summary-title">AI 보안 분석 종합 설명</span>
+              </div>
+              <div class="summary-content">{{ gx }}</div>
+            </div>
+          {% endif %}
+        {% endif %}
+        {# ==== /Gemini 종합 설명 ==== #}
+
       </div>
 
       <!-- 탭 네비게이션 -->
@@ -320,10 +403,62 @@
       <div id="ai-analysis-tab" class="tab-content {{ 'active' if not prefer_vt else '' }}">
         <div class="analysis-section">
           <div class="section-content">
-              {% if data.ai_prediction and data.ai_prediction.ai_analysis %}
-              {% set ai_analysis = data.ai_prediction.ai_analysis %}
+              {% set ai_data = data %}
+              
+              {% if is_archive and embedded_files and embedded_files|length > 0 %}
+                {% set most_dangerous = namespace(item=None, threat_count=0, has_malicious=false) %}
+                
+                {% for item in embedded_files %}
+                  {% set rep = item.get('report') %}
+                  {% if rep and rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
+                    {% set threat_count = 0 %}
+                    {% for t in rep.ai_prediction.ai_analysis.predicted_types %}
+                      {% if t != 'Normal' %}
+                        {% set threat_count = threat_count + 1 %}
+                      {% endif %}
+                    {% endfor %}
+                    {% if threat_count > 0 %}
+                      {% set most_dangerous.has_malicious = true %}
+                      {% if threat_count > most_dangerous.threat_count %}
+                        {% set most_dangerous.item = item %}
+                        {% set most_dangerous.threat_count = threat_count %}
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+                
+                {% if most_dangerous.item %}
+                  {% set rep = most_dangerous.item.report %}
+                  {% set ai_data = {"ai_prediction": rep.ai_prediction, "filename": most_dangerous.item.filename} %}
+                  {# Gemini 설명 가져오기 #}
+                  {% set gx = rep.gemini_explanation or None %}
+                {% elif most_dangerous.has_malicious == false %}
+                  {# 모든 내부 파일이 Normal인 경우, 첫 번째 파일 사용 #}
+                  {% if embedded_files and embedded_files|length > 0 %}
+                    {% set first_file = embedded_files[0] %}
+                    {% if first_file.report and first_file.report.ai_prediction %}
+                      {% set ai_data = {"ai_prediction": first_file.report.ai_prediction, "filename": first_file.filename} %}
+                      {% set gx = first_file.report.gemini_explanation or None %}
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+                
+              {% else %}
+                {# 일반 파일의 경우 원본 data 사용 #}
+                {% set gx = (
+                    data.gemini_explanation
+                    or (data.report.gemini_explanation if data.report else None)
+                    or (data.analysis_report.gemini_explanation if data.analysis_report else None)
+                ) %}
+              {% endif %}
+              
+              {% if ai_data.ai_prediction and ai_data.ai_prediction.ai_analysis %}
+              {% set ai_analysis = ai_data.ai_prediction.ai_analysis %}
               {% set predicted_types = ai_analysis.predicted_types %}
-              {% set confidence_scores = ai_analysis.confidence_scores %}
+              {# 클래스 확률: confidence_scores → class_probabilities → {} #}
+              {% set confidence_scores = ai_analysis.confidence_scores
+                                        or ai_analysis.class_probabilities
+                                        or {} %}
               {% set model_classes = ai_analysis.model_classes %}
     
           <!-- 위험 항목 그룹 -->
@@ -380,107 +515,169 @@
           
           <div class="divider"></div>
       
-      {% if ai_analysis.network_feature_probabilities %}
-      <div class="ai-network-section">
-        <h3>📊 네트워크 활동 분석</h3>
-        <div class="network-stats">
-          {% set feature_names = {
-            'external_session_count': '외부 연결 시도',
-            'http_any_external_file_download': '파일 다운로드',
-            'http_any_request': 'HTTP 요청',
-            'dns_any_request': 'DNS 조회',
-            'http_hosts_count': '호스트 연결',
-            'dns_domains_count': '도메인 조회',
-            'http_user_agents_count': '사용자 에이전트',
-            'http_redirect_chain_count': '리다이렉트 체인',
-            'http_download_mime_types_count': '다운로드 타입',
-            'http_methods_count': 'HTTP 메서드',
-            'protocols_count': '프로토콜 사용'
-          } %}
-          
-          {% set feature_icons = {
-            'external_session_count': '🌐',
-            'http_any_external_file_download': '📥',
-            'http_any_request': '🔗',
-            'dns_any_request': '🔍',
-            'http_hosts_count': '🏠',
-            'dns_domains_count': '🌍',
-            'http_user_agents_count': '👤',
-            'http_redirect_chain_count': '🔄',
-            'http_download_mime_types_count': '📄',
-            'http_methods_count': '⚡',
-            'protocols_count': '🔧'
-          } %}
-          
-          {% set sorted_features = [] %}
-          {% for feature, probability in ai_analysis.network_feature_probabilities.items() %}
-          {% if probability > 0.1 %}  
-              {% set _ = sorted_features.append((feature, probability)) %}
-            {% endif %}
-          {% endfor %}
-          {% set sorted_features = sorted_features|sort(attribute=1, reverse=true) %}
-          
-          {% for feature, probability in sorted_features[:5] %}
-          {% set prob_percent = (probability * 100)|round(1) if probability <= 1 else probability|round(1) %}
-          {% if prob_percent > 100 %}
-            {% set prob_percent = 100 %}
-          {% endif %}
-          {% set risk_level = 'high' if prob_percent > 60 else 'medium' if prob_percent > 30 else 'low' %}
-          <div class="stat-item {{ risk_level }}">
-            <div class="stat-header">
-              <span class="stat-icon">{{ feature_icons.get(feature, '📊') }}</span>
-              <span class="stat-name">{{ feature_names.get(feature, feature) }}</span>
-              <span class="stat-value">{{ prob_percent }}%</span>
-            </div>
-            <div class="stat-bar">
-              <div class="stat-fill {{ risk_level }}" data-width="{{ prob_percent }}"></div>
-            </div>
-            <div class="stat-desc">{{ feature }}</div>
-          </div>
-          {% endfor %}
-          
-          {% if sorted_features|length > 5 %}
-          <button class="show-all-btn" onclick="toggleAllStats()">전체 통계 보기 ({{ sorted_features|length }}개) ▼</button>
-          <div class="additional-stats hidden" id="additional-stats">
-            {% for feature, probability in sorted_features[5:] %}
-            {% set prob_percent = (probability * 100)|round(1) if probability <= 1 else probability|round(1) %}
-            {% if prob_percent > 100 %}
-              {% set prob_percent = 100 %}
-            {% endif %}
-            {% set risk_level = 'high' if prob_percent > 60 else 'medium' if prob_percent > 30 else 'low' %}
-            <div class="stat-item {{ risk_level }}">
-              <div class="stat-header">
-                <span class="stat-icon">{{ feature_icons.get(feature, '📊') }}</span>
-                <span class="stat-name">{{ feature_names.get(feature, feature) }}</span>
-                <span class="stat-value">{{ prob_percent }}%</span>
-              </div>
-              <div class="stat-bar">
-                <div class="stat-fill {{ risk_level }}" data-width="{{ prob_percent }}"></div>
-              </div>
-              <div class="stat-desc">{{ feature }}</div>
-            </div>
-            {% endfor %}
-          </div>
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
-      
       <div class="ai-footer">
         <div class="ai-disclaimer">
           💡 <strong>AI 분석 안내:</strong> 이 결과는 기계학습 모델에 기반한 예측입니다. 
           실제 악성코드 여부는 전문 보안 도구를 통해 확인하시기 바랍니다.
               </div>
             </div>
+            
+            <!-- Gemini XAI 설명 -->
+            {# ==== Gemini XAI 설명 (근거) ==== #}
+            {# Normal이 아닐 때만 표시 #}
+            {% set hard_labels = ai_data.ai_prediction.ai_analysis.predicted_types if (ai_data.ai_prediction and ai_data.ai_prediction.ai_analysis) else [] %}
+            {% set is_only_normal = hard_labels|length == 1 and hard_labels[0] == 'Normal' %}
+            {% if gx and not is_only_normal %}
+              {% if gx is mapping and gx.xai %}
+                <div class="gemini-xai-section">
+                  <div class="xai-header">
+                    <span class="xai-title">AI 분석 근거 (XAI)</span>
+                  </div>
+
+                  <div class="xai-content">
+                    {% if gx.xai.bullets %}
+                      <ul>
+                        {% for b in gx.xai.bullets %}
+                          <li>{{ b }}</li>
+                        {% endfor %}
+                      </ul>
+                    {% endif %}
+                  </div>
+                </div>
               {% else %}
-              <div class="no-data-message">
-                <div class="no-data-icon">🤖</div>
-                <div class="no-data-text">AI 분석 결과가 없습니다.</div>
+                <div class="gemini-xai-section">
+                  <div class="xai-header">
+                    <span class="xai-title">AI 분석 근거 (XAI)</span>
+                  </div>
+                  <div class="xai-content">{{ gx }}</div>
+                </div>
+              {% endif %}
+            {% endif %}
+            {# ==== /Gemini XAI 설명 ==== #}
+
+            <!-- SHAP 기반 특징 중요도 표시 -->
+            {# ==== SHAP 기반 특징 중요도 (XAI) ==== #}
+            {# Normal이 아닐 때만 표시 #}
+            {% if ai_data.ai_prediction and ai_data.ai_prediction.ai_analysis and not is_only_normal %}
+              {% set feature_importance = ((ai_data.ai_prediction.ai_analysis.model_info or {}).get('enhanced_features', {}) or {}).get('feature_importance') if ai_data.ai_prediction.ai_analysis.get('model_info') else None %}
+              <!-- DEBUG: feature_importance exists = {{ feature_importance is not none }}, count = {{ feature_importance|length if feature_importance else 0 }} -->
+              {% if feature_importance %}
+              <div class="feature-importance-section">
+                <div class="feature-header">
+                  <span class="feature-title">SHAP 기반 특징 중요도 (XAI)</span>
+                  <span class="feature-subtitle">SHAP(SHapley Additive exPlanations)을 통해 각 악성코드 클래스 판단에 기여한 주요 특징들과 그 영향도를 분석한 결과입니다.</span>
+                </div>
+
+                <div class="feature-content">
+                  {# 클래스별로 그룹화 #}
+                  {% set class_groups = {} %}
+                  {% for feature_name, importance in feature_importance.items() %}
+                    {% if feature_name.startswith('Backdoor_') %}
+                      {% set class_name = 'Backdoor' %}
+                    {% elif feature_name.startswith('Botnet_') %}
+                      {% set class_name = 'Botnet' %}
+                    {% elif feature_name.startswith('Download_') %}
+                      {% set class_name = 'Download' %}
+                    {% elif feature_name.startswith('Infiltration_') %}
+                      {% set class_name = 'Infiltration' %}
+                    {% elif feature_name.startswith('Normal_') %}
+                      {% set class_name = 'Normal' %}
+                    {% elif feature_name.startswith('soft_') %}
+                      {% set class_name = 'Soft_' + feature_name.split('_')[1] %}
+                    {% else %}
+                      {% set class_name = 'Other' %}
+                    {% endif %}
+                    
+                    {% if class_name not in class_groups %}
+                      {% set _ = class_groups.update({class_name: []}) %}
+                    {% endif %}
+                    {% set _ = class_groups[class_name].append((feature_name, importance)) %}
+                  {% endfor %}
+                  
+                  {# 각 클래스별로 박스 표시 #}
+                  <div class="class-boxes-container">
+                    {% for class_name, features in class_groups.items() %}
+                      {% set sorted_features = features|sort(attribute=1, reverse=true) %}
+                      <div class="class-box">
+                        <div class="class-box-header">
+                          {% if class_name == 'Backdoor' %}
+                            <span class="class-icon backdoor">🔴</span>
+                            <span class="class-name">Backdoor</span>
+                          {% elif class_name == 'Botnet' %}
+                            <span class="class-icon botnet">🟡</span>
+                            <span class="class-name">Botnet</span>
+                          {% elif class_name == 'Download' %}
+                            <span class="class-icon download">🔵</span>
+                            <span class="class-name">Download</span>
+                          {% elif class_name == 'Infiltration' %}
+                            <span class="class-icon infiltration">🟠</span>
+                            <span class="class-name">Infiltration</span>
+                          {% elif class_name == 'Normal' %}
+                            <span class="class-icon normal">🟢</span>
+                            <span class="class-name">Normal</span>
+                          {% elif class_name.startswith('Soft_') %}
+                            <span class="class-icon soft">⭐</span>
+                            <span class="class-name">{{ class_name.replace('Soft_', 'Soft ') }}</span>
+                          {% else %}
+                            <span class="class-icon">🔍</span>
+                            <span class="class-name">{{ class_name }}</span>
+                          {% endif %}
+                        </div>
+                        
+                        <div class="class-box-features">
+                            {% for feature_name, importance in sorted_features %}
+                              <div class="simple-feature-row">
+                                <span class="simple-feature-name">
+                                  {% if feature_name.startswith('Backdoor_') %}
+                                    {{ feature_name.replace('Backdoor_', '').replace('_', ' ') }}
+                                  {% elif feature_name.startswith('Botnet_') %}
+                                    {{ feature_name.replace('Botnet_', '').replace('_', ' ') }}
+                                  {% elif feature_name.startswith('Download_') %}
+                                    {{ feature_name.replace('Download_', '').replace('_', ' ') }}
+                                  {% elif feature_name.startswith('Infiltration_') %}
+                                    {{ feature_name.replace('Infiltration_', '').replace('_', ' ') }}
+                                  {% elif feature_name.startswith('Normal_') %}
+                                    {{ feature_name.replace('Normal_', '').replace('_', ' ') }}
+                                  {% elif feature_name.startswith('soft_') %}
+                                    {% set parts = feature_name.replace('soft_', '').split('_', 1) %}
+                                    {{ (parts[1] if parts|length > 1 else feature_name).replace('_', ' ') }}
+                                  {% else %}
+                                    {{ feature_name.replace('_', ' ') }}
+                                  {% endif %}
+                                </span>
+                                <div class="simple-bar-container">
+                                  <div class="simple-bar-fill" style="width: {{ (importance * 100)|round(1) }}%">
+                                    <span class="simple-percentage-in-bar">{{ (importance * 100)|round(1) }}%</span>
+                                  </div>
+                                </div>
+                              </div>
+                            {% endfor %}
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+
+                </div>
               </div>
               {% endif %}
+            {% endif %}
+
           </div>
         </div>
       </div>
+
+      {% else %}
+      <div class="no-data-message">
+        <div class="no-data-icon">🤖</div>
+        <div class="no-data-text">
+          {% if is_archive and embedded_files and embedded_files|length > 0 %}
+            압축 파일 내부 파일들의 AI 분석 결과가 없습니다.
+          {% else %}
+            AI 분석 결과가 없습니다.
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
 
       <!-- VirusTotal 바이러스 검사 결과 탭 콘텐츠 -->
       <div id="virustotal-tab" class="tab-content {{ 'active' if prefer_vt else '' }}">

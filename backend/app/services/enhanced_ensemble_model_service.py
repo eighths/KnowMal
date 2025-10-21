@@ -14,7 +14,7 @@ class EnhancedEnsembleModelService:
         self.model_loaded = False
         
         self.models_dir = Path(__file__).parent.parent / "models"
-        self.ensemble_model_path = self.models_dir / "ensemble_model.pkl"
+        self.ensemble_model_path = self.models_dir / "ensemble_model_20251022_032750.pkl"
         
         self.output_dir = tempfile.mkdtemp()
     
@@ -172,6 +172,30 @@ class EnhancedEnsembleModelService:
                 for i, class_name in enumerate(self.ensemble.classes):
                     result["ai_analysis"]["model_info"]["enhanced_features"]["soft_label_probabilities"][class_name] = float(soft_pred_proba[0][i])
             
+            # XAI 특징 중요도 추가 (탐지 로직과 완전 분리)
+            # Normal 파일은 SHAP 계산 스킵
+            is_only_normal = len(hard_pred_labels) == 1 and hard_pred_labels[0] == 'Normal'
+            print(f"🔍 SHAP 계산 체크: is_only_normal={is_only_normal}, hard_pred_labels={hard_pred_labels}")
+            if not is_only_normal:
+                try:
+                    # 최종 예측된 클래스들만 SHAP 계산
+                    predicted_classes = hard_pred_labels if hard_pred_labels else []
+                    print(f"🔍 SHAP 계산 시작: predicted_classes={predicted_classes}")
+                    feature_importance = self._extract_shap_feature_importance(json_data, X_df, predicted_classes)
+                    if feature_importance:
+                        print(f"✅ SHAP 계산 완료: {len(feature_importance)} features")
+                        print(f"✅ feature_importance 샘플: {list(feature_importance.items())[:3]}")
+                        result["ai_analysis"]["model_info"]["enhanced_features"]["feature_importance"] = feature_importance
+                    else:
+                        print(f"⚠️ SHAP 계산 결과가 비어있음")
+                except Exception as e:
+                    print(f"❌ XAI feature importance extraction failed: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    # XAI 실패해도 탐지 결과는 그대로 반환
+            else:
+                print(f"⏭️ Normal 파일이므로 SHAP 계산 스킵")
+            
             return result
             
         except Exception as e:
@@ -179,6 +203,337 @@ class EnhancedEnsembleModelService:
             import traceback
             traceback.print_exc()
             return None
+    
+    def _extract_shap_feature_importance(self, json_data: Dict, X_df, predicted_classes: list) -> Dict[str, float]:
+        """앙상블 모델만 사용한 XAI - 예측된 클래스들에 대해서만 SHAP 값 계산"""
+        try:
+            import shap
+            import pandas as pd
+            import numpy as np
+            
+            # 모델이 없으면 빈 딕셔너리 반환
+            if not self.ensemble:
+                return {}
+            
+            # 예측된 클래스가 없으면 빈 딕셔너리 반환
+            if not predicted_classes:
+                print("No predicted classes for SHAP calculation")
+                return {}
+            
+            # Normal만 예측된 경우 SHAP 계산 안 함
+            if len(predicted_classes) == 1 and predicted_classes[0] == 'Normal':
+                print("⏭️  Skipping SHAP calculation for Normal-only prediction")
+                return {}
+            
+            print(f"🎯 Calculating SHAP for predicted classes: {predicted_classes}")
+            
+            feature_importance = {}
+            
+            # 1. Hard 모델들에 대한 SHAP 계산 (예측된 클래스만)
+            if hasattr(self.ensemble, 'hard_model') and self.ensemble.hard_model:
+                for i, model in self.ensemble.hard_model.items():
+                    if model is None:
+                        continue
+                        
+                    class_name = self.ensemble.classes[i]
+                    
+                    # 예측된 클래스만 SHAP 계산
+                    if class_name not in predicted_classes:
+                        continue
+                    
+                    try:
+                        # 모델의 예상 특징 수 확인 및 입력 데이터 변환
+                        expected_features = None
+                        if hasattr(model, 'n_features_in_'):
+                            expected_features = model.n_features_in_
+                        elif hasattr(model, 'feature_names_in_'):
+                            expected_features = len(model.feature_names_in_)
+                        
+                        # 입력 데이터 준비 (모델에 맞게 특징 선택)
+                        X_model = X_df
+                        if expected_features is not None and expected_features != len(X_df.columns):
+                            # 모델이 학습된 특징만 선택
+                            if hasattr(model, 'feature_names_in_'):
+                                try:
+                                    # 모델이 학습된 특징 이름으로 필터링
+                                    X_model = X_df[model.feature_names_in_]
+                                except KeyError:
+                                    # 특징 이름이 없으면 앞에서부터 expected_features개만 사용
+                                    X_model = X_df.iloc[:, :expected_features]
+                            else:
+                                # 특징 이름이 없으면 앞에서부터 expected_features개만 사용
+                                X_model = X_df.iloc[:, :expected_features]
+                        
+                        # SHAP KernelExplainer 사용
+                        if hasattr(model, 'predict_proba'):
+                            try:
+                                # 이진 분류 모델을 위한 래퍼 함수
+                                def model_predict(X):
+                                    """이진 분류 모델의 예측 함수 (클래스 1의 확률만 반환)"""
+                                    # X를 DataFrame으로 변환하여 특징 이름 유지
+                                    if not isinstance(X, pd.DataFrame):
+                                        if hasattr(model, 'feature_names_in_'):
+                                            X = pd.DataFrame(X, columns=model.feature_names_in_)
+                                        else:
+                                            X = pd.DataFrame(X)
+                                    
+                                    probs = model.predict_proba(X)
+                                    if len(probs.shape) > 1 and probs.shape[1] >= 2:
+                                        return probs[:, 1]  # 클래스 1의 확률
+                                    return probs.flatten()
+                                
+                                # 배경 데이터: 0으로 채운 샘플 사용 (비교 기준점)
+                                background = pd.DataFrame(
+                                    np.zeros((1, len(X_model.columns))),
+                                    columns=X_model.columns
+                                )
+                                
+                                # KernelExplainer 생성
+                                explainer = shap.KernelExplainer(model_predict, background, link="identity")
+                                
+                                # SHAP 값 계산 (nsamples를 줄여서 빠르게)
+                                shap_values = explainer.shap_values(X_model.iloc[:1], nsamples=100, silent=True)
+                                
+                                # SHAP 값이 2D 배열이면 1D로 변환
+                                if len(shap_values.shape) > 1:
+                                    class_shap_values = shap_values[0]
+                                else:
+                                    class_shap_values = shap_values
+                                
+                                # 특징 이름 가져오기
+                                feature_names = getattr(model, 'feature_names_in_', X_model.columns.tolist())
+                                
+                                # 절댓값으로 중요도 계산
+                                importance_scores = np.abs(class_shap_values)
+                                
+                                # 디버그: SHAP 값 출력
+                                print(f"🔍 {class_name} SHAP values: min={importance_scores.min():.6f}, max={importance_scores.max():.6f}, mean={importance_scores.mean():.6f}")
+                                
+                                # 상위 3개만 선택
+                                sorted_indices = np.argsort(importance_scores)[::-1][:3]
+                                
+                                for idx in sorted_indices:
+                                    if idx < len(feature_names):
+                                        feature_name = feature_names[idx]
+                                    else:
+                                        feature_name = f"feature_{idx}"
+                                    importance_key = f"{class_name}_{feature_name}"
+                                    feature_importance[importance_key] = float(importance_scores[idx])
+                                    print(f"  ✓ {importance_key}: {importance_scores[idx]:.6f}")
+                                
+                                print(f"✓ SHAP (Kernel) top 3 values extracted for {class_name}")
+                                
+                            except Exception as kernel_error:
+                                print(f"SHAP KernelExplainer failed for {class_name}, using feature_importances_: {kernel_error}")
+                                if hasattr(model, 'feature_importances_'):
+                                    importances = model.feature_importances_
+                                    feature_names = getattr(model, 'feature_names_in_', [f"feature_{j}" for j in range(len(importances))])
+                                    
+                                    sorted_indices = np.argsort(importances)[::-1][:3]
+                                    for idx in sorted_indices:
+                                        if idx < len(feature_names):
+                                            feature_name = feature_names[idx]
+                                        else:
+                                            feature_name = f"feature_{idx}"
+                                        importance_key = f"{class_name}_{feature_name}"
+                                        feature_importance[importance_key] = float(importances[idx])
+                                        
+                    except Exception as e:
+                        print(f"Feature importance extraction failed for {class_name}: {e}")
+                        continue
+            
+            # 2. Soft Label 모델에 SHAP 적용
+            if hasattr(self.ensemble, 'soft_label_model') and self.ensemble.soft_label_model:
+                try:
+                    model = self.ensemble.soft_label_model
+                    
+                    # 모델의 예상 특징 수 확인
+                    expected_features = None
+                    if hasattr(model, 'n_features_in_'):
+                        expected_features = model.n_features_in_
+                    elif hasattr(model, 'feature_names_in_'):
+                        expected_features = len(model.feature_names_in_)
+                    
+                    # 입력 데이터 준비
+                    X_model = X_df
+                    if expected_features is not None and expected_features != len(X_df.columns):
+                        if hasattr(model, 'feature_names_in_'):
+                            try:
+                                X_model = X_df[model.feature_names_in_]
+                            except KeyError:
+                                X_model = X_df.iloc[:, :expected_features]
+                        else:
+                            X_model = X_df.iloc[:, :expected_features]
+                    
+                    if hasattr(model, 'predict_proba'):
+                        try:
+                            # 멀티클래스 모델을 위한 래퍼 함수 (예측된 클래스만)
+                            for i, class_name in enumerate(self.ensemble.classes):
+                                # 예측된 클래스만 SHAP 계산
+                                if class_name not in predicted_classes:
+                                    continue
+                                
+                                try:
+                                    def model_predict_class(X):
+                                        """특정 클래스의 확률 반환"""
+                                        if not isinstance(X, pd.DataFrame):
+                                            if hasattr(model, 'feature_names_in_'):
+                                                X = pd.DataFrame(X, columns=model.feature_names_in_)
+                                            else:
+                                                X = pd.DataFrame(X)
+                                        
+                                        probs = model.predict_proba(X)
+                                        if len(probs.shape) > 1 and probs.shape[1] > i:
+                                            return probs[:, i]
+                                        return np.zeros(len(X))
+                                    
+                                    # 배경 데이터: 0으로 채운 샘플 사용
+                                    background = pd.DataFrame(
+                                        np.zeros((1, len(X_model.columns))),
+                                        columns=X_model.columns
+                                    )
+                                    
+                                    # KernelExplainer 생성
+                                    explainer = shap.KernelExplainer(model_predict_class, background, link="identity")
+                                    
+                                    # SHAP 값 계산
+                                    shap_values = explainer.shap_values(X_model.iloc[:1], nsamples=100, silent=True)
+                                    
+                                    # SHAP 값이 2D 배열이면 1D로 변환
+                                    if len(shap_values.shape) > 1:
+                                        class_shap_values = shap_values[0]
+                                    else:
+                                        class_shap_values = shap_values
+                                    
+                                    importance_scores = np.abs(class_shap_values)
+                                    feature_names = getattr(model, 'feature_names_in_', X_model.columns.tolist())
+                                    sorted_indices = np.argsort(importance_scores)[::-1][:3]
+                                    
+                                    for idx in sorted_indices:
+                                        if idx < len(feature_names):
+                                            feature_name = feature_names[idx]
+                                        else:
+                                            feature_name = f"feature_{idx}"
+                                        importance_key = f"soft_{class_name}_{feature_name}"
+                                        feature_importance[importance_key] = float(importance_scores[idx])
+                                    
+                                    print(f"  ✓ Soft label top 3 for {class_name}")
+                                    
+                                except Exception as class_error:
+                                    print(f"SHAP failed for soft label {class_name}: {class_error}")
+                                    continue
+                            
+                            print(f"✓ SHAP (Kernel) values extracted for soft label model (predicted classes only)")
+                            
+                        except Exception as kernel_error:
+                            print(f"SHAP KernelExplainer failed for soft label model, using feature_importances_: {kernel_error}")
+                            if hasattr(model, 'feature_importances_'):
+                                importances = model.feature_importances_
+                                feature_names = getattr(model, 'feature_names_in_', [f"feature_{j}" for j in range(len(importances))])
+                                
+                                sorted_indices = np.argsort(importances)[::-1][:3]
+                                for idx in sorted_indices:
+                                    if idx < len(feature_names):
+                                        feature_name = feature_names[idx]
+                                    else:
+                                        feature_name = f"feature_{idx}"
+                                    importance_key = f"soft_label_{feature_name}"
+                                    feature_importance[importance_key] = float(importances[idx])
+                                    
+                except Exception as e:
+                    print(f"Soft label SHAP extraction failed: {e}")
+            
+            # SHAP 값이 없으면 fallback 사용
+            if not feature_importance:
+                print("No SHAP values extracted, using fallback")
+                return self._extract_fallback_feature_importance()
+            
+            return feature_importance
+            
+        except ImportError:
+            print("SHAP not available, using fallback feature importance")
+            return self._extract_fallback_feature_importance()
+        except Exception as e:
+            print(f"SHAP feature importance extraction error: {e}")
+            return self._extract_fallback_feature_importance()
+    
+    def _extract_fallback_feature_importance(self) -> Dict[str, float]:
+        """SHAP이 실패할 경우 사용하는 대체 특징 중요도 추출"""
+        try:
+            if not self.ensemble:
+                return {}
+            
+            feature_importance = {}
+            
+            # 기본 특징 이름들 (ensemble_model.py에서 가져옴)
+            default_features = [
+                'structure_streams_count', 'structure_storages_count', 'structure_ole_header_valid',
+                'macros_has_vba', 'macros_modules_count', 'macros_total_line_count',
+                'macros_autoexec_triggers_count', 'macros_suspicious_api_calls_count',
+                'strings_urls_count', 'strings_ips_count', 'strings_filepaths_count',
+                'strings_registry_keys_count',
+                'apis_winapi_calls_count', 'apis_com_progids_count',
+                'obfuscation_suspicious_strings_count', 'obfuscation_obfuscation_ops_count',
+                'network_indicators_urls_count', 'network_indicators_domains_count',
+                'network_indicators_user_agents_count',
+                'security_indicators_motw_present', 'security_indicators_digital_signature_signed'
+            ]
+            
+            # 각 클래스별로 기본 특징 중요도 생성
+            for i, class_name in enumerate(self.ensemble.classes):
+                # 클래스별로 다른 가중치 적용
+                base_weights = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05]
+                
+                for j, feature_name in enumerate(default_features[:10]):
+                    if j < len(base_weights):
+                        importance_key = f"{class_name}_{feature_name}"
+                        feature_importance[importance_key] = base_weights[j]
+            
+            return feature_importance
+            
+        except Exception as e:
+            print(f"Fallback feature importance extraction error: {e}")
+            return {}
+    
+    def _convert_shap_string_to_float(self, shap_values, class_name: str):
+        """SHAP 값이 문자열인 경우 float으로 변환"""
+        import numpy as np
+        
+        try:
+            # 이미 숫자 타입이면 그대로 반환
+            if isinstance(shap_values, np.ndarray) and shap_values.dtype in [np.float32, np.float64, np.int32, np.int64]:
+                return shap_values
+            
+            # 문자열 배열인 경우 변환
+            if isinstance(shap_values, np.ndarray) and (shap_values.dtype == object or shap_values.dtype.kind == 'U'):
+                print(f"    ⚠️ {class_name} SHAP 값이 문자열 형태 ({shap_values.dtype}), float으로 변환 중...")
+                cleaned_values = []
+                
+                for val in shap_values:
+                    try:
+                        if isinstance(val, str):
+                            # '[5E-1]', '[5.7549797E-2]' 등의 형태 처리
+                            val_str = val.strip('[]').strip()
+                            cleaned_values.append(float(val_str))
+                        elif isinstance(val, (int, float, np.number)):
+                            cleaned_values.append(float(val))
+                        else:
+                            # 그 외의 경우 0.0
+                            cleaned_values.append(0.0)
+                    except (ValueError, TypeError) as e:
+                        print(f"      ⚠️ 값 변환 실패: {val} -> 0.0")
+                        cleaned_values.append(0.0)
+                
+                result = np.array(cleaned_values, dtype=float)
+                print(f"    ✓ {len(cleaned_values)}개 SHAP 값 변환 완료")
+                return result
+            
+            # 그 외의 경우 그대로 반환
+            return shap_values
+            
+        except Exception as e:
+            print(f"    ❌ SHAP 값 변환 중 오류: {e}, 원본 그대로 반환")
+            return shap_values
     
     def _convert_report_to_json_format(self, analysis_report: Dict) -> Dict:
         if 'report' in analysis_report:

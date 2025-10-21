@@ -14,6 +14,8 @@ from app.cache.keys import file_data_key
 from app.config import get_settings
 from app.services.ai_model_service import get_ai_model_service
 from app.services.ensemble_model_service import get_ensemble_model_service
+from app.services.gemini_service import get_gemini_service
+from app.external.virustotal import get_virustotal_client
 
 
 router = APIRouter(prefix="/scan", tags=["scan"])
@@ -83,6 +85,44 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
                     ai_prediction = ensemble_model_service.predict_malware_type(report)
                     if ai_prediction:
                         report['ai_prediction'] = ai_prediction
+                        # DEBUG: feature_importance 확인
+                        fi = ai_prediction.get("ai_analysis", {}).get("model_info", {}).get("enhanced_features", {}).get("feature_importance")
+                        print(f"📊 일반 파일 feature_importance 존재: {fi is not None}, 개수: {len(fi) if fi else 0}")
+                        
+                        # Gemini 설명 생성
+                        try:
+                            hard_labels = ai_prediction.get("ai_analysis", {}).get("predicted_types", [])
+                            is_only_normal = len(hard_labels) == 1 and hard_labels[0] == 'Normal'
+                            print(f"🔍 일반 파일 Gemini 체크: is_only_normal={is_only_normal}, hard_labels={hard_labels}")
+                            
+                            # Normal 파일도 Gemini 설명 생성 (SHAP은 이미 서비스에서 스킵됨)
+                            gemini_service = get_gemini_service()
+                            print(f"🔍 Gemini 서비스 상태: initialized={gemini_service.initialized if gemini_service else 'None'}")
+                            if gemini_service and gemini_service.initialized:
+                                virustotal_result = None
+                                try:
+                                    vt_client = get_virustotal_client()
+                                    vt_response = vt_client.get_file_analysis(sha256)
+                                    if vt_response and vt_response.get("available"):
+                                        virustotal_result = vt_response
+                                except Exception as e:
+                                    print(f"VT failed: {e}")
+                                
+                                feature_importance = ai_prediction.get("ai_analysis", {}).get("model_info", {}).get("enhanced_features", {}).get("feature_importance")
+                                
+                                # Normal 파일은 feature_importance가 없어도 Gemini 호출
+                                print(f"✅ Gemini 호출 시작 (Normal={is_only_normal})")
+                                gemini_explanation = gemini_service.explain(ai_prediction, virustotal_result, feature_importance)
+                                if gemini_explanation:
+                                    print(f"✅ Gemini 설명 생성 완료: {type(gemini_explanation)}")
+                                    report["gemini_explanation"] = gemini_explanation
+                                else:
+                                    print(f"⚠️ Gemini 설명이 비어있음")
+                        except Exception as e:
+                            print(f"❌ Gemini failed: {e}")
+                            import traceback
+                            traceback.print_exc()
+                        
                     print(f"[DEBUG] 일반 파일 AI 예측 완료")
                 except Exception as e:
                     print(f"[ERROR] 일반 파일 AI 예측 실패: {e}")
@@ -97,6 +137,46 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
                             ai_prediction = ensemble_model_service.predict_malware_type(rep)
                             if ai_prediction:
                                 rep['ai_prediction'] = ai_prediction
+                                # DEBUG: feature_importance 확인
+                                fi = ai_prediction.get("ai_analysis", {}).get("model_info", {}).get("enhanced_features", {}).get("feature_importance")
+                                print(f"📊 내부 파일 {item.get('filename')} feature_importance 존재: {fi is not None}, 개수: {len(fi) if fi else 0}")
+                                
+                                # Gemini 설명 생성
+                                try:
+                                    hard_labels = ai_prediction.get("ai_analysis", {}).get("predicted_types", [])
+                                    is_only_normal = len(hard_labels) == 1 and hard_labels[0] == 'Normal'
+                                    print(f"🔍 내부 파일 Gemini 체크: is_only_normal={is_only_normal}, hard_labels={hard_labels}")
+                                    
+                                    # Normal 파일도 Gemini 설명 생성 (SHAP은 이미 서비스에서 스킵됨)
+                                    gemini_service = get_gemini_service()
+                                    if gemini_service and gemini_service.initialized:
+                                        # 내부 파일의 hash 가져오기
+                                        file_hash = rep.get('file', {}).get('hash', {}).get('sha256', sha256)
+                                        
+                                        virustotal_result = None
+                                        try:
+                                            vt_client = get_virustotal_client()
+                                            vt_response = vt_client.get_file_analysis(file_hash)
+                                            if vt_response and vt_response.get("available"):
+                                                virustotal_result = vt_response
+                                        except Exception as e:
+                                            print(f"VT failed for embedded file: {e}")
+                                        
+                                        feature_importance = ai_prediction.get("ai_analysis", {}).get("model_info", {}).get("enhanced_features", {}).get("feature_importance")
+                                        
+                                        # Normal 파일은 feature_importance가 없어도 Gemini 호출
+                                        print(f"✅ 내부 파일 Gemini 호출 시작 (Normal={is_only_normal})")
+                                        gemini_explanation = gemini_service.explain(ai_prediction, virustotal_result, feature_importance)
+                                        if gemini_explanation:
+                                            print(f"✅ 내부 파일 Gemini 설명 생성 완료")
+                                            rep["gemini_explanation"] = gemini_explanation
+                                        else:
+                                            print(f"⚠️ 내부 파일 Gemini 설명이 비어있음")
+                                except Exception as e:
+                                    print(f"❌ Gemini failed for embedded file: {e}")
+                                    import traceback
+                                    traceback.print_exc()
+                                
                             print(f"[DEBUG] 내부 파일 {i+1} AI 예측 완료")
                         except Exception as e:
                             print(f"[ERROR] 내부 파일 {i+1} AI 예측 실패: {e}")

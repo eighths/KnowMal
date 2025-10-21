@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     REMOTE_MAX_BYTES: int = 50 * 1024 * 1024  # 최대 다운로드 크기 (50MB)
     REMOTE_USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
+    # Gemini API 설정
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_ENABLED: bool = os.getenv("GEMINI_ENABLED", "true").lower() == "true"
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_TIMEOUT: int = int(os.getenv("GEMINI_TIMEOUT", "30"))
+
     class Config:
         env_file = ".env.dev"
         extra = "ignore"
