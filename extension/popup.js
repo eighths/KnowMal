@@ -108,9 +108,41 @@ function updateVirusTotalResult(detections, total) {
     vtDetections.textContent = detections || 0;
     vtTotal.textContent = total || 0;
     vtDetectionsText.textContent = detections || 0;
-    
-    updateOverallConclusion(detections, total);
   }
+  
+  updateVirusTotalSection(detections, total);
+  updateOverallConclusion(detections, total);
+}
+
+function updateVirusTotalSection(detections, total) {
+  const vtRiskLevel = document.getElementById('vtRiskLevel');
+  const vtRiskPercentage = document.getElementById('vtRiskPercentage');
+  const vtRiskDetails = document.getElementById('vtRiskDetails');
+  const vtTotalEngines = document.getElementById('vtTotalEngines');
+  const vtDetections = document.getElementById('vtDetections');
+  const vtScanDate = document.getElementById('vtScanDate');
+  
+  if (vtRiskLevel && vtRiskPercentage && vtRiskDetails) {
+    const percentage = total > 0 ? (detections / total) * 100 : 0;
+    
+    if (percentage >= 50) {
+      vtRiskLevel.textContent = '매우 위험';
+      vtRiskPercentage.textContent = percentage.toFixed(1) + '%';
+      vtRiskDetails.textContent = detections + '/' + total + ' 탐지';
+    } else if (percentage >= 10) {
+      vtRiskLevel.textContent = '주의';
+      vtRiskPercentage.textContent = percentage.toFixed(1) + '%';
+      vtRiskDetails.textContent = detections + '/' + total + ' 탐지';
+    } else {
+      vtRiskLevel.textContent = '정상';
+      vtRiskPercentage.textContent = percentage.toFixed(1) + '%';
+      vtRiskDetails.textContent = detections + '/' + total + ' 탐지';
+    }
+  }
+  
+  if (vtTotalEngines) vtTotalEngines.textContent = total + '개';
+  if (vtDetections) vtDetections.textContent = detections + '개';
+  if (vtScanDate) vtScanDate.textContent = new Date().toLocaleDateString();
 }
 
 function updateOverallConclusion(detections, total) {
@@ -122,18 +154,53 @@ function updateOverallConclusion(detections, total) {
   const warningTitle = overallConclusion.querySelector('.warning-title');
   const warningSubtitle = overallConclusion.querySelector('.warning-subtitle');
   
+  // 모든 CSS 클래스 제거
+  overallConclusion.classList.remove('safe', 'danger', 'warning');
+  
   if (percentage >= 50) {
     warningIcon.textContent = '🚨';
     warningTitle.textContent = '위험: 파일을 열지 마세요';
     warningSubtitle.textContent = '악성코드가 탐지되었습니다';
+    
+    // 위험 상태일 때 CSS 클래스 추가
+    overallConclusion.classList.add('danger');
+    
+    // 위험 상태일 때 상세 설명 표시
+    const warningDescription = overallConclusion.querySelector('.warning-description');
+    if (warningDescription) {
+      warningDescription.style.display = 'block';
+      warningDescription.style.marginTop = '8px';
+      warningDescription.style.fontSize = '10px';
+      warningDescription.style.color = '#7f1d1d';
+      warningDescription.style.fontWeight = '500';
+      warningDescription.style.lineHeight = '1.3';
+    }
   } else if (percentage >= 10) {
     warningIcon.textContent = '⚠️';
     warningTitle.textContent = '주의: 신중하게 검토 필요';
     warningSubtitle.textContent = '악성코드 가능성이 있습니다';
+    
+    // 주의 상태일 때 CSS 클래스 추가
+    overallConclusion.classList.add('warning');
+    
+    // 주의 상태일 때 상세 설명 숨김
+    const warningDescription = overallConclusion.querySelector('.warning-description');
+    if (warningDescription) {
+      warningDescription.style.display = 'none';
+    }
   } else {
     warningIcon.textContent = '✅';
-    warningTitle.textContent = '정상: 이상 없음';
-    warningSubtitle.textContent = '알려진 악성코드가 없습니다';
+    warningTitle.textContent = '정상: 안전한 파일';
+    warningSubtitle.textContent = '악성코드를 포함하지 않는 파일입니다';
+    
+    // 정상 상태일 때 CSS 클래스 추가
+    overallConclusion.classList.add('safe');
+    
+    // 상세 설명 숨김
+    const warningDescription = overallConclusion.querySelector('.warning-description');
+    if (warningDescription) {
+      warningDescription.style.display = 'none';
+    }
   }
   
   overallConclusion.style.display = 'flex';
@@ -141,6 +208,56 @@ function updateOverallConclusion(detections, total) {
   if (detailedResults) {
     detailedResults.style.display = 'none';
   }
+}
+
+function updateAIAnalysisResult(aiAnalysis) {
+  const detailedResults = document.querySelector('.detailed-results');
+  if (!detailedResults) return;
+  
+  const predictedTypes = aiAnalysis.predicted_types || [];
+  const confidenceScores = aiAnalysis.confidence_scores || {};
+  
+  updateAIPredictionSection(confidenceScores);
+  
+  const aiDetailSection = detailedResults.querySelector('.ai-detail');
+  if (aiDetailSection) {
+    const detailTags = aiDetailSection.querySelector('.detail-tags');
+    if (detailTags) {
+      detailTags.innerHTML = '';
+      
+      predictedTypes.forEach(type => {
+        const tag = document.createElement('span');
+        tag.className = 'detail-tag ai-tag-' + type.toLowerCase();
+        tag.textContent = type;
+        detailTags.appendChild(tag);
+      });
+      
+      Object.entries(confidenceScores).forEach(([type, score]) => {
+        if (score > 0.3 && !predictedTypes.includes(type)) { // 30% 이상이고 예측 타입에 없는 경우
+          const tag = document.createElement('span');
+          tag.className = 'detail-tag ai-confidence-' + type.toLowerCase();
+          tag.textContent = `${type} (${(score * 100).toFixed(1)}%)`;
+          detailTags.appendChild(tag);
+        }
+      });
+    }
+  }
+  
+  console.log('🤖 AI 분석 결과 업데이트:', aiAnalysis);
+}
+
+function updateAIPredictionSection(confidenceScores) {
+  console.log('AI 예측 결과 업데이트 (신뢰도 제거됨)');
+}
+
+function updateNetworkStats(networkStats) {
+  const netExternalSession = document.getElementById('netExternalSession');
+  const netDnsDomains = document.getElementById('netDnsDomains');
+  const netHttpHost = document.getElementById('netHttpHost');
+  
+  if (netExternalSession) netExternalSession.textContent = networkStats.external_session_count || '-';
+  if (netDnsDomains) netDnsDomains.textContent = networkStats.dns_domains_count || '-';
+  if (netHttpHost) netHttpHost.textContent = networkStats.http_host_count || '-';
 }
 
 function toggleDetails() {
@@ -203,6 +320,10 @@ async function loadVirusTotalResult() {
     
     const reportData = await reportRes.json();
     console.log("리포트 데이터:", reportData);
+    
+    if (reportData.ai_prediction && reportData.ai_prediction.ai_analysis) {
+      updateAIAnalysisResult(reportData.ai_prediction.ai_analysis);
+    }
     
     if (reportData.virustotal && reportData.virustotal.available) {
       const malicious = reportData.virustotal.scan_summary?.malicious || 0;
@@ -269,7 +390,7 @@ function resetToInitialState() {
   setPill("", "대기");
   setProgress(0);
   
-  btnUpload.textContent = "서버로 전송"; 
+  btnUpload.textContent = "바이러스 검사"; 
   btnUpload.disabled = true; 
   btnReport.disabled = true;
   

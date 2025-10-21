@@ -1,7 +1,6 @@
-self.API_BASE =
-  typeof API_BASE !== "undefined"
-    ? API_BASE
-    : self.API_BASE || "http://localhost:8000";
+const API_BASE = "http://localhost:8000";  //개발용
+//const API_BASE = "https://knowmal.duckdns.org";  
+
 
 console.log("[KnowMal] background boot, API_BASE =", self.API_BASE);
 
@@ -309,6 +308,44 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: false, error: "OAuth 미완료 또는 시간초과" });
       }
       return;
+      const { url, init } = msg;
+      const resp = await fetch(url, {
+        method: init?.method || "GET",
+        headers: init?.headers || {},
+        body: init?.body,
+        redirect: "follow",
+        credentials: init?.credentials || "include",
+        referrer: init?.referrer || undefined,
+        referrerPolicy: init?.referrerPolicy || undefined,
+      });
+
+      if (msg.type === "maloffice.fetchBinary") {
+        const buf = await resp.arrayBuffer();
+        sendResponse({
+          ok: resp.ok,
+          status: resp.status,
+          headers: Object.fromEntries(resp.headers.entries()),
+          buffer: buf
+        });
+      } else {
+        const text = await resp.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch { /* JSON 아니면 null */ }
+        sendResponse({
+          ok: resp.ok,
+          status: resp.status,
+          headers: Object.fromEntries(resp.headers.entries()),
+          text,
+          json: data
+        });
+      }
+    } catch (e) {
+      console.error("Background script error:", e);
+      sendResponse({ 
+        ok: false, 
+        error: (e && e.message) || String(e),
+        contextInvalid: e.message.includes("context invalidated")
+      });
     }
 
     if (msg?.type === "KM_OAUTH_ENSURE_FORCE") {
@@ -404,9 +441,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             text = await r.text();
           }
         } catch (e) {
-          text = await r.text();
+      text = await r.text();
         }
-        
+      
         console.log("[KnowMal] KM_FETCH final response:", { 
           ok: r.ok, 
           status: r.status, 

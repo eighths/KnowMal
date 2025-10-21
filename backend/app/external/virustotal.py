@@ -50,9 +50,6 @@ class VirusTotalAPI:
             malicious = stats.get("malicious", 0)
             suspicious = stats.get("suspicious", 0)
             
-            print(f"🔍 VT 통계: malicious={malicious}, suspicious={suspicious}, total_engines={total_engines}")
-            print(f"🔍 VT 실제 엔진 수: {len(results)}")
-            print(f"🔍 VT stats 합계: {sum(stats.values())}")
             
             threat_classification = attrs.get("popular_threat_classification", {})
             suggested_label = threat_classification.get("suggested_threat_label", "")
@@ -117,7 +114,6 @@ class VirusTotalAPI:
             return str(timestamp)
     
     def get_file_analysis(self, sha256: str) -> Dict[str, Any]:
-        print(f"🔍 VirusTotal 조회 중: {sha256[:16]}...")
         
         raw_response = self.query_file_report(sha256)
         parsed_result = self.parse_vt_response(raw_response)
@@ -125,17 +121,12 @@ class VirusTotalAPI:
         if parsed_result.get("available"):
             detection_rate = parsed_result["scan_summary"]["detection_rate"]
             malicious_count = parsed_result["scan_summary"]["malicious"]
-            print(f"✅ VT 결과: {malicious_count}개 엔진 탐지 ({detection_rate}%)")
-        else:
-            error_type = parsed_result.get("error", "unknown")
-            print(f"❌ VT 조회 실패: {error_type}")
         
         return parsed_result
 
 _vt_client = None
 
 def get_virustotal_client() -> VirusTotalAPI:
-    """VirusTotal 클라이언트 인스턴스 반환"""
     global _vt_client
     if _vt_client is None:
         _vt_client = VirusTotalAPI()
