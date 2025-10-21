@@ -270,18 +270,23 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
         try:
             vt_api_key = getattr(settings, 'VT_API_KEY', None)
             if not vt_api_key:
-                logger.warning("VirusTotal API 키가 설정되지 않음")
+                logger.warning("[TISTORY] VirusTotal API 키가 설정되지 않음")
                 virustotal_result = None
             else:
-                logger.info(f"VirusTotal API 키 확인됨: {vt_api_key[:8]}...")
+                logger.info(f"[TISTORY] VirusTotal API 키 확인됨: {vt_api_key[:8]}...")
                 vt_client = get_virustotal_client()
                 # 상위(컨테이너/단일 파일)에 대한 VT 조회
+                logger.info(f"[TISTORY] VirusTotal 조회 시작: {filename} (SHA256: {sha_hex[:16]}...)")
                 virustotal_result = vt_client.get_file_analysis(sha_hex)
                 if virustotal_result and virustotal_result.get("available"):
-                    logger.info(f"VirusTotal 조회 완료: {filename}")
+                    logger.info(f"[TISTORY] VirusTotal 조회 완료: {filename} - 탐지율: {virustotal_result.get('scan_summary', {}).get('detection_rate', 0)}%")
+                else:
+                    logger.warning(f"[TISTORY] VirusTotal 조회 결과 없음: {filename} - {virustotal_result.get('error', 'unknown')}")
+                    
                 # 압축 내부 파일들의 VT 결과 보강
                 try:
                     if analysis_result and analysis_result.get('embedded_files'):
+                        logger.info(f"[TISTORY] 내부 파일 VT 조회 시작: {len(analysis_result.get('embedded_files', []))}개 파일")
                         for idx, item in enumerate(analysis_result.get('embedded_files') or []):
                             child_report = (item or {}).get('report') or {}
                             if not isinstance(child_report, dict):
@@ -294,17 +299,21 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
                             if not child_sha:
                                 continue
                             try:
+                                logger.info(f"[TISTORY] 내부 파일 VT 조회: {item.get('filename')} ({child_sha[:16]}...)")
                                 child_vt = vt_client.get_file_analysis(child_sha)
                                 if child_vt:
                                     child_report['virustotal'] = child_vt
                                     item['report'] = child_report
-                                    logger.info(f"내부 파일 VT 결과 추가: {item.get('filename')} ({child_sha})")
+                                    logger.info(f"[TISTORY] 내부 파일 VT 결과 추가: {item.get('filename')} - 탐지율: {child_vt.get('scan_summary', {}).get('detection_rate', 0)}%")
+                                else:
+                                    logger.warning(f"[TISTORY] 내부 파일 VT 조회 결과 없음: {item.get('filename')}")
                             except Exception as ve:
-                                logger.warning(f"내부 파일 VT 조회 실패(index={idx}): {ve}")
+                                logger.warning(f"[TISTORY] 내부 파일 VT 조회 실패(index={idx}): {ve}")
+                        logger.info(f"[TISTORY] 내부 파일 VT 조회 완료")
                 except Exception as inner_e:
-                    logger.warning(f"내부 파일 VT 보강 처리 중 오류: {inner_e}")
+                    logger.warning(f"[TISTORY] 내부 파일 VT 보강 처리 중 오류: {inner_e}")
         except Exception as e:
-            logger.error(f"VirusTotal 조회 중 오류: {e}")
+            logger.error(f"[TISTORY] VirusTotal 조회 중 오류: {e}")
             virustotal_result = None
         
         cache_data = {

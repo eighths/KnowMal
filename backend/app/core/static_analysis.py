@@ -133,22 +133,48 @@ def extract_archive_files(file_bytes: bytes, filename: str = "", password: str =
                         print(f"[DEBUG] ZIP 파일 처리 중: {file_info.filename}, 크기: {file_info.file_size} bytes")
                         
                         try:
-                            try:
-                                file_data = zf.read(file_info.filename, pwd=password.encode('utf-8'))
-                            except (RuntimeError, zipfile.BadZipFile):
+                            passwords_to_try = [password, "pass", "1234", "password", "123", ""]
+                            file_data = None
+                            
+                            for pwd in passwords_to_try:
                                 try:
-                                    file_data = zf.read(file_info.filename)
-                                except Exception:
+                                    if pwd:
+                                        file_data = zf.read(file_info.filename, pwd=pwd.encode('utf-8'))
+                                        print(f"[DEBUG] 비밀번호 '{pwd}'로 성공: {file_info.filename}")
+                                        break
+                                    else:
+                                        file_data = zf.read(file_info.filename)
+                                        print(f"[DEBUG] 비밀번호 없이 성공: {file_info.filename}")
+                                        break
+                                except (RuntimeError, zipfile.BadZipFile):
                                     continue
+                            
+                            if file_data is None:
+                                print(f"[DEBUG] 모든 비밀번호 시도 실패: {file_info.filename}")
+                                continue
                             
                             print(f"[DEBUG] 내부 파일 분석 시작: {file_info.filename}")
                             file_report = analyze_bytes(
                                 file_bytes=file_data,
                                 filename=file_info.filename,
-                                use_cache=True,
+                                use_cache=False,  
                                 include_virustotal=True
                             )
                             print(f"[DEBUG] 내부 파일 분석 완료: {file_info.filename}")
+                            
+                            if file_report and not file_report.get('virustotal'):
+                                try:
+                                    from app.external.virustotal import get_virustotal_client
+                                    file_sha256 = file_report.get('file', {}).get('hash', {}).get('sha256')
+                                    if file_sha256:
+                                        print(f"[DEBUG] 내부 파일 VirusTotal 조회 강제 수행: {file_info.filename}")
+                                        vt_client = get_virustotal_client()
+                                        vt_result = vt_client.get_file_analysis(file_sha256)
+                                        if vt_result:
+                                            file_report['virustotal'] = vt_result
+                                            print(f"[DEBUG] 내부 파일 VirusTotal 결과 추가: {file_info.filename}")
+                                except Exception as e:
+                                    print(f"[DEBUG] 내부 파일 VirusTotal 조회 실패: {file_info.filename} - {e}")
                             
                             extracted_files.append({
                                 'filename': file_info.filename,
