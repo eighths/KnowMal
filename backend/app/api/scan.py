@@ -8,7 +8,7 @@ from app.db import SessionLocal
 from app.db import schema
 from app.db.models import FileRecord
 from app.db.schema import FileOut
-from app.core.static_analysis import sniff_mime, extract_excerpt, analyze_bytes, analyze_file, get_cached_report
+from app.core.static_analysis import sniff_mime, extract_excerpt, analyze_bytes, analyze_file, get_cached_report, test_zip_detection
 from app.cache.redis_client import get_redis
 from app.cache.keys import file_data_key
 from app.config import get_settings
@@ -56,13 +56,53 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
     db.commit()
 
     try:
-        report = analyze_bytes(file_bytes, filename, ttl_sec=settings.SHARE_TTL_SECONDS, use_cache=True)
+        print(f"[DEBUG] analyze_bytes 호출 시작 - 파일: {filename}")
+        report = analyze_bytes(
+            file_bytes=file_bytes, 
+            filename=filename, 
+            ttl_sec=settings.SHARE_TTL_SECONDS, 
+            use_cache=True,
+            include_virustotal=True
+        )
+        print(f"[DEBUG] analyze_bytes 호출 완료 - report 타입: {type(report)}")
         
+        if isinstance(report, dict):
+            print(f"[DEBUG] analyze_bytes 결과 - is_archive: {report.get('file', {}).get('is_archive')}")
+            print(f"[DEBUG] analyze_bytes 결과 - embedded_files 수: {len(report.get('embedded_files', []))}")
+        else:
+            print(f"[DEBUG] analyze_bytes 결과가 dict가 아님: {report}")
+
+        print(f"[DEBUG] AI 모델 서비스 시작")
         ensemble_model_service = get_ensemble_model_service()
-        ai_prediction = None
-        if ensemble_model_service.model_loaded and report:
-            ai_prediction = ensemble_model_service.predict_malware_type(report)
+        print(f"[DEBUG] ensemble_model_service.model_loaded: {ensemble_model_service.model_loaded}")
         
+        if ensemble_model_service.model_loaded and report:
+            if 'embedded_files' not in report:
+                print(f"[DEBUG] 일반 파일 AI 예측 시작")
+                try:
+                    ai_prediction = ensemble_model_service.predict_malware_type(report)
+                    if ai_prediction:
+                        report['ai_prediction'] = ai_prediction
+                    print(f"[DEBUG] 일반 파일 AI 예측 완료")
+                except Exception as e:
+                    print(f"[ERROR] 일반 파일 AI 예측 실패: {e}")
+                    pass
+            else:
+                print(f"[DEBUG] 압축 파일 내부 파일들 AI 예측 시작")
+                for i, item in enumerate(report.get('embedded_files', []) or []):
+                    rep = item.get('report')
+                    if rep:
+                        try:
+                            print(f"[DEBUG] 내부 파일 {i+1} AI 예측 중: {item.get('filename')}")
+                            ai_prediction = ensemble_model_service.predict_malware_type(rep)
+                            if ai_prediction:
+                                rep['ai_prediction'] = ai_prediction
+                            print(f"[DEBUG] 내부 파일 {i+1} AI 예측 완료")
+                        except Exception as e:
+                            print(f"[ERROR] 내부 파일 {i+1} AI 예측 실패: {e}")
+                            rep['ai_prediction'] = None
+                print(f"[DEBUG] 압축 파일 내부 파일들 AI 예측 완료")
+
         cache_data = {
             "filename": filename,
             "mime_type": mime,
@@ -72,17 +112,29 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
             "report": report
         }
         
-        if ai_prediction:
-            cache_data["ai_prediction"] = ai_prediction
-        
+        if report and isinstance(report, dict):
+            is_archive = report.get('file', {}).get('is_archive', False)
+            embedded_files = report.get('embedded_files', [])
+            print(f"[DEBUG] scan.py - is_archive: {is_archive}, embedded_files 수: {len(embedded_files)}")
+            if embedded_files:
+                print(f"[DEBUG] 첫 번째 embedded file: {embedded_files[0].get('filename')}")
+
         redis_client = get_redis()
         file_cache_key = file_data_key(sha256)
+        print(f"[DEBUG] Redis 캐시 저장 - 키: {file_cache_key}")
+        print(f"[DEBUG] 저장될 데이터: filename={cache_data.get('filename')}, report_type={type(cache_data.get('report'))}")
+        if isinstance(cache_data.get('report'), dict):
+            report_data = cache_data.get('report')
+            print(f"[DEBUG] report 내용: is_archive={report_data.get('file', {}).get('is_archive')}, embedded_files수={len(report_data.get('embedded_files', []))}")
         redis_client.setex(file_cache_key, settings.SHARE_TTL_SECONDS, json.dumps(cache_data, ensure_ascii=False))
-        
+
     except Exception as e:
+        print(f"[ERROR] analyze_bytes 실패: {e}")
+        import traceback
+        print(f"[ERROR] 상세 에러 정보: {traceback.format_exc()}")
         background_tasks.add_task(analyze_bytes, file_bytes, filename)
 
-    return JSONResponse({
+    resp = {
         "ok": True,
         "id": rec.id,
         "filename": rec.filename,
@@ -90,7 +142,15 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
         "size_bytes": rec.size_bytes,
         "excerpt_preview": (rec.content_excerpt or "")[:300],
         "sha256": sha256
-    })
+    }
+    
+    print(f"[DEBUG] scan.py 업로드 응답: {resp}")
+    try:
+        vt = (report or {}).get('virustotal') if isinstance(report, dict) else None
+        ss = (vt or {}).get('scan_summary') or {}
+    except Exception:
+        pass
+    return JSONResponse(resp)
 
 @router.get("/recent", response_model=list[FileOut])
 def recent(db: Session = Depends(get_db)):
@@ -168,3 +228,18 @@ def reload_models():
             "message": "Legacy AI model reloaded successfully" if ai_success else "Failed to reload legacy AI model"
         }
     }
+
+@router.post("/test-zip-detection")
+async def test_zip_detection_endpoint(file: UploadFile = File(...)):
+    try:
+        file_bytes = await file.read()
+        result = test_zip_detection(file_bytes, file.filename)
+        return JSONResponse({
+            "ok": True,
+            "test_result": result
+        })
+    except Exception as e:
+        return JSONResponse({
+            "ok": False,
+            "error": str(e)
+        }, status_code=500)
