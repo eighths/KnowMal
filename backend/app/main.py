@@ -55,6 +55,15 @@ def render_share_report(request: Request, share_id: str):
     except Exception:
         is_archive = False
 
+    if isinstance(data, dict):
+        report = data.get("analysis_report") or data.get("report")
+        if report:
+            embedded_files = report.get("embedded_files", [])
+            print(f"[DEBUG] main.py - is_archive: {is_archive}, embedded_files 수: {len(embedded_files)}")
+            print(f"[DEBUG] data 키들: {list(data.keys())}")
+            if embedded_files:
+                print(f"[DEBUG] 첫 번째 embedded file: {embedded_files[0].get('filename')}")
+
     template_name = "report.html" if is_archive else "report_unzip.html"
     
     return templates.TemplateResponse(

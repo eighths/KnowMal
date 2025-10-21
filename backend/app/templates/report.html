@@ -28,9 +28,10 @@
           </div>
         </div>
 
-        <!-- 압축 파일 정보 카드 -->
+        <!-- 압축 파일 정보 카드 -->      
         {% set embedded_files = (data.analysis_report.embedded_files if data.analysis_report and data.analysis_report.embedded_files else []) %}
         {% set is_archive = (data.analysis_report.file.is_archive if data.analysis_report and data.analysis_report.file and data.analysis_report.file.is_archive else False) %}
+        
         {% if is_archive and embedded_files and embedded_files|length > 0 and data.analysis_report.features.structure %}
         <div class="file-card" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid #e2e8f0; margin-bottom: 20px;">
           <div style="padding: 24px;">
@@ -129,6 +130,56 @@
       {% endif %}
 
       {% set original_archive_filename = data.filename %}
+      {% set display_filename = data.filename %}
+      {% set display_size = data.size_bytes %}
+      {% set display_sha = data.sha256 %}
+      {% set display_mime = data.mime_type %}
+      {% if is_archive and embedded_files and embedded_files|length > 0 %}
+        {% set selected = None %}
+        {% set best_rate = -1 %}
+        {% for item in embedded_files %}
+          {% set rep = item.report %}
+          {% if rep and rep.virustotal and rep.virustotal.scan_summary %}
+            {% set _sum = rep.virustotal.scan_summary %}
+            {% set _total = (_sum.total or 0) %}
+            {% set _mal = (_sum.malicious or 0) %}
+            {% set _rate = (_mal / _total) if _total > 0 else 0 %}
+            {% if _rate > best_rate %}
+              {% set selected = item %}
+              {% set best_rate = _rate %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% if not selected %}
+          {% set best_ai = -1 %}
+          {% for item in embedded_files %}
+            {% set rep = item.report %}
+            {% set cnt = 0 %}
+            {% if rep and rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
+              {% for t in rep.ai_prediction.ai_analysis.predicted_types %}
+                {% if t != 'Normal' %}{% set cnt = cnt + 1 %}{% endif %}
+              {% endfor %}
+            {% endif %}
+            {% if cnt > best_ai %}
+              {% set selected = item %}
+              {% set best_ai = cnt %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {% if not selected %}
+          {% set selected = embedded_files[0] %}
+        {% endif %}
+        {% set rep = selected.report %}
+        {% if rep and rep.file %}
+          {% set display_filename = selected.filename or rep.file.filename or data.filename %}
+          {% set display_size = selected.size_bytes or rep.file.size_bytes or data.size_bytes %}
+          {% set display_sha = (rep.file.hash.sha256 if rep.file.hash else data.sha256) %}
+          {% set display_mime = rep.file.mime_type or data.mime_type %}
+        {% else %}
+          {% set display_filename = selected.filename or data.filename %}
+          {% set display_size = selected.size_bytes or data.size_bytes %}
+        {% endif %}
+      {% endif %}
       
       {% if is_archive and embedded_files and embedded_files|length > 0 %}
         {% set agg = namespace(max_rate=0.0, child_vt=None, ai_types=[]) %}
@@ -261,19 +312,19 @@
               <div class="file-info-section">
                 <div class="file-info-item">
                   <div class="info-label">파일명</div>
-                  <div class="info-value">{{ original_archive_filename if is_archive else data.filename }}</div>
+                  <div class="info-value">{{ display_filename }}</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">크기</div>
-                  <div class="info-value">{{ (data.size_bytes / 1024 / 1024)|round(1) }} MB</div>
+                  <div class="info-value">{{ (display_size / 1024 / 1024)|round(1) }} MB</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">SHA-256</div>
-                  <div class="info-value">{{ (data.sha256[:8] + '...' + data.sha256[-4:]) if data.sha256 else 'unknown' }}</div>
+                  <div class="info-value">{{ (display_sha[:8] + '...' + display_sha[-4:]) if display_sha else 'unknown' }}</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">문서 유형</div>
-                  {% set mime_type = data.mime_type or "알 수 없음" %}
+                  {% set mime_type = display_mime or "알 수 없음" %}
                   {% set friendly_type = "알 수 없음" %}
                   {% if mime_type.startswith('application/msword') or mime_type.startswith('application/vnd.openxmlformats-officedocument.wordprocessingml') %}
                     {% set friendly_type = "Word 문서" %}
@@ -440,19 +491,19 @@
               <div class="file-info-section">
                 <div class="file-info-item">
                   <div class="info-label">파일명</div>
-                  <div class="info-value">{{ original_archive_filename if is_archive else data.filename }}</div>
+                  <div class="info-value">{{ display_filename }}</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">크기</div>
-                  <div class="info-value">{{ (data.size_bytes / 1024 / 1024)|round(1) }} MB</div>
+                  <div class="info-value">{{ (display_size / 1024 / 1024)|round(1) }} MB</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">SHA-256</div>
-                  <div class="info-value">{{ (data.sha256[:8] + '...' + data.sha256[-4:]) if data.sha256 else 'unknown' }}</div>
+                  <div class="info-value">{{ (display_sha[:8] + '...' + display_sha[-4:]) if display_sha else 'unknown' }}</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">문서 유형</div>
-                  {% set mime_type = data.mime_type or "알 수 없음" %}
+                  {% set mime_type = display_mime or "알 수 없음" %}
                   {% set friendly_type = "알 수 없음" %}
                   {% if mime_type.startswith('application/msword') or mime_type.startswith('application/vnd.openxmlformats-officedocument.wordprocessingml') %}
                     {% set friendly_type = "Word 문서" %}
@@ -748,44 +799,50 @@
       <div id="virustotal-tab" class="tab-content {{ 'active' if prefer_vt else '' }}">
         <div class="analysis-section vt-section">
           <div class="section-content">
-            
+            {#
+              아카이브일 때는 내부 파일의 VT 결과를 직접 보여준다.
+              - 가장 높은 탐지율을 가진 내부 파일을 선택하며, 파일명도 함께 추적한다.
+              - 아카이브가 아니면 서버가 전달한 virustotal 사용.
+            #}
+            {# 상단에서 계산된 virustotal(내부 파일 집계)을 우선 사용 #}
+            {% set vt_display = virustotal %}
+            {% set vt_filename = display_filename if display_filename else data.filename %}
             {% if is_archive and embedded_files and embedded_files|length > 0 %}
-              {% set most_dangerous_vt = namespace(item=None, rate=0, has_vt_data=false) %}
-              
-              {% for item in embedded_files %}
-                {% set rep = item.report %}
-                {% if rep and rep.virustotal and rep.virustotal.available and rep.virustotal.scan_summary %}
-                  {% set most_dangerous_vt.has_vt_data = true %}
-                  {% set vt_summary = rep.virustotal.scan_summary %}
-                  {% set vt_malicious = (vt_summary.malicious or 0) %}
-                  {% set vt_total = (vt_summary.total or 0) %}
-                  {% set vt_rate = (vt_malicious / vt_total * 100) if vt_total > 0 else 0 %}
-                  {% if vt_rate > most_dangerous_vt.rate %}
-                    {% set most_dangerous_vt.item = item %}
-                    {% set most_dangerous_vt.rate = vt_rate %}
+              {% if not vt_display or not vt_display.scan_summary %}
+                {% set most_dangerous_vt = namespace(item=None, rate=0, has_vt_data=false) %}
+                {% for item in embedded_files %}
+                  {% set rep = item.report %}
+                  {% if rep and rep.virustotal and rep.virustotal.available and rep.virustotal.scan_summary %}
+                    {% set most_dangerous_vt.has_vt_data = true %}
+                    {% set vt_summary = rep.virustotal.scan_summary %}
+                    {% set vt_malicious = (vt_summary.malicious or 0) %}
+                    {% set vt_total = (vt_summary.total or 0) %}
+                    {% set vt_rate = (vt_malicious / vt_total * 100) if vt_total > 0 else 0 %}
+                    {% if vt_rate > most_dangerous_vt.rate %}
+                      {% set most_dangerous_vt.item = item %}
+                      {% set most_dangerous_vt.rate = vt_rate %}
+                    {% endif %}
                   {% endif %}
-                {% endif %}
-              {% endfor %}
-              
-              {% if most_dangerous_vt.item %}
-                {% set rep = most_dangerous_vt.item.report %}
-                {% set vt_display = rep.virustotal %}
-              {% elif most_dangerous_vt.has_vt_data == false %}
-                {# VirusTotal 데이터가 없는 경우, 첫 번째 파일의 VT 데이터 시도 #}
-                {% if embedded_files and embedded_files|length > 0 %}
+                {% endfor %}
+                {% if most_dangerous_vt.item %}
+                  {% set rep = most_dangerous_vt.item.report %}
+                  {% set vt_display = rep.virustotal %}
+                  {% set vt_filename = most_dangerous_vt.item.filename %}
+                {% else %}
+                  {# VT 데이터가 없으면 첫 번째 파일 시도 #}
                   {% set first_file = embedded_files[0] %}
                   {% if first_file.report and first_file.report.virustotal %}
                     {% set vt_display = first_file.report.virustotal %}
-                  {% else %}
-                    {% set vt_display = None %}
+                    {% set vt_filename = first_file.filename %}
                   {% endif %}
-                {% else %}
-                  {% set vt_display = None %}
                 {% endif %}
-              {% else %}
-                {% set vt_display = None %}
               {% endif %}
             {% else %}
+              {% set vt_display = virustotal %}
+            {% endif %}
+
+            {# 최종 보정: 선택 실패 시 상단에서 계산된 virustotal을 재사용 #}
+            {% if not vt_display and virustotal %}
               {% set vt_display = virustotal %}
             {% endif %}
             
@@ -852,7 +909,7 @@
               </p>
             {% endif %}
             
-            {% if vt_display and vt_display.available %}
+            {% if vt_display and (vt_display.available or vt_display.scan_summary) %}
             <!-- VirusTotal 데이터가 있는 경우에만 표시되는 기존 UI -->
             <!-- 위험도 요약 카드 -->
             <div class="vt-risk-card severity-{{ severity_class }}">
