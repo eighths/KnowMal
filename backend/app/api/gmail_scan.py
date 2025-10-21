@@ -252,6 +252,8 @@ def scan(
 
         redis_client = get_redis()
         file_cache_key = file_data_key(sha256)
+        file_bytes_b64 = base64.b64encode(file_bytes).decode('utf-8')
+        
         cache_data = {
             "filename": fname,
             "mime_type": mime_type,
@@ -260,7 +262,8 @@ def scan(
             "file_id": file_record.id,
             "analysis_report": analysis_result,
             "ai_prediction": ai_prediction,
-            "virustotal": virustotal_result
+            "virustotal": virustotal_result,
+            "file_bytes": file_bytes_b64  
         }
         redis_client.setex(
             file_cache_key, 
@@ -357,3 +360,211 @@ def scan(
         "ai_prediction": ai_prediction,
         "virustotal": virustotal_result
     }
+
+@router.get("/download/{message_id}")
+def download_attachment(
+    message_id: str,
+    filename: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
+    ext_id: Optional[str] = Header(None, alias="X-KM-Ext-Id"),
+    account_email: Optional[str] = Header(None, alias="X-KM-Account-Email"),
+    db: Session = Depends(get_db),
+):
+    """Gmail 첨부파일 다운로드 엔드포인트 - scan에서 이미 다운로드한 파일 재사용"""
+    google_sub = get_google_sub_from_auth(authorization, ext_id)
+    user_id_key = f"{google_sub}:{account_email}" if account_email else google_sub
+    print(f"[GMAIL][download] ext_id={ext_id} account_email={account_email} -> user_id_key={user_id_key}")
+    print(f"[GMAIL][download] msg_id={message_id} filename={filename}")
+
+    # scan에서 이미 다운로드한 파일이 있는지 확인
+    try:
+        from app.cache.redis_client import get_redis
+        from app.cache.keys import file_data_key
+        import json
+        
+        redis_client = get_redis()
+        
+        # 최근 스캔된 파일들 중에서 해당 message_id와 filename이 일치하는 파일 찾기
+        from app.db.models import FileRecord
+        recent_file = (
+            db.query(FileRecord)
+            .filter(
+                FileRecord.source == "gmail",
+                FileRecord.source_url.like(f"gmail://{message_id}%")
+            )
+            .order_by(FileRecord.created_at.desc())
+            .first()
+        )
+        
+        if recent_file and recent_file.sha256:
+            file_cache_key = file_data_key(recent_file.sha256)
+            cached_data = redis_client.get(file_cache_key)
+            
+            if cached_data:
+                cache_data = json.loads(cached_data)
+                cached_filename = cache_data.get('filename', '')
+                
+                # 파일명이 일치하거나 요청된 파일명이 없는 경우
+                if not filename or cached_filename == filename or cached_filename.endswith(filename):
+                    print(f"[GMAIL][download] 캐시된 파일 사용: {cached_filename}")
+                    
+                    # 캐시에서 파일 바이트 가져오기
+                    file_bytes = None
+                    try:
+                        from app.core.static_analysis import get_cached_file_bytes
+                        file_bytes = get_cached_file_bytes(recent_file.sha256)
+                    except Exception as e:
+                        print(f"[GMAIL][download] 캐시에서 파일 바이트 가져오기 실패: {e}")
+                    
+                    if file_bytes:
+                        from fastapi.responses import Response
+                        import urllib.parse
+                        
+                        # 파일명 정리
+                        clean_filename = cached_filename.replace('\n', '').replace('\r', '').strip()
+                        ascii_filename = clean_filename.encode('ascii', 'ignore').decode('ascii')
+                        if not ascii_filename:
+                            ascii_filename = "attachment"
+                        
+                        encoded_filename = urllib.parse.quote(clean_filename.encode('utf-8'))
+                        content_disposition = f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
+                        
+                        print(f"[GMAIL][download] 캐시된 파일 반환: {clean_filename} ({len(file_bytes)} bytes)")
+                        return Response(
+                            content=file_bytes,
+                            media_type="application/octet-stream",
+                            headers={"Content-Disposition": content_disposition}
+                        )
+        
+        print(f"[GMAIL][download] 캐시된 파일을 찾을 수 없음, 새로 다운로드")
+        
+    except Exception as e:
+        print(f"[GMAIL][download] 캐시 확인 중 오류: {e}")
+
+    # 캐시에서 찾을 수 없으면 기존 방식으로 다운로드
+    rec = None
+    if account_email:
+        rec = (
+            db.query(OAuthAccount)
+            .filter(OAuthAccount.provider == "gmail", OAuthAccount.email == account_email)
+            .order_by(OAuthAccount.updated_at.desc())
+            .first()
+        )
+    if rec is None:
+        rec = (
+            db.query(OAuthAccount)
+            .filter(OAuthAccount.provider == "gmail", OAuthAccount.user_id == user_id_key)
+            .first()
+        )
+    if rec is None and account_email:
+        rec = (
+            db.query(OAuthAccount)
+            .filter(OAuthAccount.provider == "gmail", OAuthAccount.user_id == google_sub)
+            .order_by(OAuthAccount.updated_at.desc())
+            .first()
+        )
+    if not rec:
+        print(f"[GMAIL][download] OAuthAccount not found for user_id={user_id_key}")
+        raise HTTPException(401, "not linked")
+
+    access_token = ensure_fresh_access_token(db, rec)
+
+    try:
+        if account_email:
+            ui = requests.get(
+                "https://openidconnect.googleapis.com/v1/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=HTTP_TIMEOUT,
+            )
+            if ui.status_code == 200:
+                token_email = (ui.json() or {}).get("email")
+                if token_email and token_email.lower() != account_email.lower():
+                    print(
+                        f"[GMAIL][download] access_token email mismatch: token_email={token_email} account_email={account_email}"
+                    )
+                    raise HTTPException(401, "not linked")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[GMAIL][download] userinfo check failed: {e}")
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    r = requests.get(f"{GMAIL_BASE}/messages/{message_id}?format=full", headers=headers, timeout=HTTP_TIMEOUT)
+    if r.status_code == 403:
+        raise HTTPException(401, "insufficient_scopes")
+    if r.status_code != 200:
+        raise HTTPException(400, f"gmail message get failed: {r.text}")
+    msg = r.json()
+    payload = msg.get("payload") or {}
+
+    part = _find_attachment_part(payload, filename)
+    if not part:
+        part = _find_attachment_part(payload, None)
+        if not part:
+            raise HTTPException(404, "attachment not found")
+
+    att_id = part["body"]["attachmentId"]
+    fname = part.get("filename") or (filename or "attachment.bin")
+    
+    print(f"[GMAIL][download] Found attachment:")
+    print(f"  - attachmentId: {att_id}")
+    print(f"  - filename: {fname}")
+    print(f"  - requested filename: {filename}")
+    print(f"  - mimeType: {part.get('mimeType', 'unknown')}")
+    print(f"  - body size: {part.get('body', {}).get('size', 'unknown')}")
+
+    r2 = requests.get(f"{GMAIL_BASE}/messages/{message_id}/attachments/{att_id}", headers=headers, timeout=HTTP_TIMEOUT)
+    if r2.status_code == 403:
+        raise HTTPException(401, "insufficient_scopes")
+    if r2.status_code != 200:
+        raise HTTPException(400, f"gmail attachment get failed: {r2.text}")
+    data64 = r2.json().get("data")
+    if not data64:
+        raise HTTPException(400, "attachment has no data")
+    file_bytes = base64.urlsafe_b64decode(data64 + "===")
+    
+    # 파일 내용 검증
+    print(f"[GMAIL][download] File content validation:")
+    print(f"  - File size: {len(file_bytes)} bytes")
+    print(f"  - First 16 bytes (hex): {file_bytes[:16].hex()}")
+    print(f"  - First 16 bytes (ascii): {file_bytes[:16]}")
+    
+    # 파일 시그니처 확인
+    if len(file_bytes) >= 4:
+        signature = file_bytes[:4]
+        if signature == b'PK\x03\x04':
+            print(f"  - Detected: ZIP file")
+        elif signature == b'Rar!':
+            print(f"  - Detected: RAR file")
+        elif signature == b'\x1f\x8b\x08':
+            print(f"  - Detected: GZIP file")
+        elif file_bytes[:2] == b'PK':
+            print(f"  - Detected: ZIP-like file")
+        else:
+            print(f"  - Unknown file type")
+
+    from fastapi.responses import Response
+    import urllib.parse
+    
+    # 파일명 정리 (특수문자 제거)
+    clean_filename = fname.replace('\n', '').replace('\r', '').strip()
+    
+    # ASCII 파일명과 UTF-8 파일명 모두 제공
+    ascii_filename = clean_filename.encode('ascii', 'ignore').decode('ascii')
+    if not ascii_filename:
+        ascii_filename = "attachment"
+    
+    # RFC 5987 형식으로 UTF-8 인코딩
+    encoded_filename = urllib.parse.quote(clean_filename.encode('utf-8'))
+    
+    # Content-Disposition 헤더 생성 (ASCII와 UTF-8 모두 포함)
+    content_disposition = f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
+    
+    print(f"[GMAIL][download] Final filename: {clean_filename}")
+    print(f"[GMAIL][download] Content-Disposition: {content_disposition}")
+    
+    return Response(
+        content=file_bytes,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": content_disposition}
+    )

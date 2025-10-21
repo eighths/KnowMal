@@ -51,6 +51,37 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return sendResponse({ ok: r.ok, status: r.status, headers: r.headers, json: r.data });
       }
 
+      if (msg.type === "KM_DOWNLOAD_FILE") {
+        try {
+          const { message_id, filename, account_email } = msg;
+          log("KM_DOWNLOAD_FILE request:", { message_id, filename, account_email });
+          
+          const extId = getExtId();
+          const downloadUrl = `${self.API_BASE || "http://localhost:8000"}/gmail/download/${encodeURIComponent(message_id)}?filename=${encodeURIComponent(filename)}`;
+          
+          const headers = {
+            "X-KM-Ext-Id": extId,
+            "X-KM-Account-Email": account_email || undefined
+          };
+          
+          log("KM_DOWNLOAD_FILE response:", {
+            download_url: downloadUrl,
+            filename: filename,
+            headers: headers
+          });
+          
+          return sendResponse({ 
+            ok: true, 
+            download_url: downloadUrl,
+            filename: filename,
+            headers: headers
+          });
+        } catch (e) {
+          log("KM_DOWNLOAD_FILE error:", e);
+          return sendResponse({ ok: false, error: String(e) });
+        }
+      }
+
       if (msg.type === "KM_OAUTH_STATUS" || msg.type === "KM_OAUTH_ENSURE") {
         return sendResponse({ ok: false, error: "OAuth not implemented in background_gmail.js" }); 
       }

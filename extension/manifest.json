@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "downloads"
   ],
   "host_permissions": [
     "http://localhost:8000/*", 
