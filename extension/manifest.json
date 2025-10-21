@@ -2,14 +2,18 @@
   "manifest_version": 3,
   "name": "MalOffice Uploader",
   "version": "0.1.0",
-  "permissions": [],
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
   "host_permissions": [
     "http://localhost:8000/*", 
     "http://127.0.0.1:8000/*",
     "http://13.125.46.188/*",
     "https://knowmal.duckdns.org/*",
     "https://*.tistory.com/*",
-    "https://blog.kakaocdn.net/*"
+    "https://blog.kakaocdn.net/*",
+    "https://mail.google.com/*"
   ],
   "action": { "default_popup": "popup.html" },
   "background": { "service_worker": "background.js" },
@@ -21,6 +25,14 @@
         "https://blog.kakaocdn.net/*"
       ],
       "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://mail.google.com/*"
+      ],
+      "js": ["content_gmail.js"],
       "run_at": "document_start",
       "all_frames": true
     }

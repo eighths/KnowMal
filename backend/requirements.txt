@@ -17,7 +17,7 @@ oletools==0.60.2
 olefile>=0.47
 tldextract==5.3.0
 pefile==2023.2.7
-ous==2.2.0
+#ous==2.2.0
 
 # python-magic>=0.4.27       # linux/server
 python-magic-bin>=0.4.14   # windows

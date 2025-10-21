@@ -1,5 +1,5 @@
-const API_BASE = "http://localhost:8000";
-const CALLBACK_PREFIX = `${API_BASE}/auth/google/callback`;
+
+const CALLBACK_PREFIX = `${self.API_BASE || "http://localhost:8000"}/auth/google/callback`;
 
 const getExtId = () => chrome.runtime.id;
 const log = (...a) => console.log("[KnowMal][BG]", ...a);
@@ -17,7 +17,7 @@ async function proxyFetch({ url, method = "GET", headers = {}, body, json, crede
   const res = await fetch(url, init);
   const ct = res.headers.get("content-type") || "";
   let data = null;
-  try { data = ct.includes("application/json") ? await res.json() : await res.text(); } catch {}
+  try { data = ct.includes("application/json") ? await res.json() : await res.text(); } catch (e) {}
   return { ok: res.ok, status: res.status, headers: Object.fromEntries(res.headers.entries()), data };
 }
 
@@ -31,7 +31,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   const url = changeInfo.url || tab?.url || "";
   if (url.startsWith(CALLBACK_PREFIX)) {
     log("callback detected → close tab & notify CS");
-    try { chrome.tabs.remove(tabId); } catch {}
+    try { chrome.tabs.remove(tabId); } catch (e) {}
     broadcastOAuthDone();
   }
 });
@@ -44,7 +44,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === "KM_PING") return sendResponse({ ok: true, pong: Date.now() });
 
       if (msg.type === "KM_EXT_INFO")
-        return sendResponse({ ok: true, ext_id: getExtId(), api_base: API_BASE });
+        return sendResponse({ ok: true, ext_id: getExtId(), api_base: self.API_BASE || "http://localhost:8000" });
 
       if (msg.type === "KM_FETCH" || msg.type === "maloffice.fetch") {
         const r = await proxyFetch(msg.payload || msg);

@@ -1,6 +1,6 @@
 (() => {
   const API_BASE = "http://localhost:8000";
-  const OFFICE_RE = /\.(docx?|xlsx?|pptx?)$/i;
+  const OFFICE_RE = /\.(docx?|xlsx?|pptx?|html?|json)$/i;
   const STYLE_ID = "maloffice-style-v2";
 
   function injectStyles() {
@@ -94,6 +94,10 @@
 
   function bgSend(type, payload={}){
     return new Promise((resolve,reject)=>{
+      if (typeof chrome === 'undefined' || !chrome.runtime) {
+        reject(new Error("Chrome extension context not available"));
+        return;
+      }
       chrome.runtime.sendMessage({type, ...payload}, (resp)=>{
         if(chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
         resolve(resp);
@@ -103,6 +107,10 @@
   function bgFetch(path, init={}){
     return new Promise((resolve,reject)=>{
       console.log("[KnowMal] bgFetch called with:", { path, init });
+      if (typeof chrome === 'undefined' || !chrome.runtime) {
+        reject(new Error("Chrome extension context not available"));
+        return;
+      }
       chrome.runtime.sendMessage({type:"KM_FETCH", url:`${API_BASE}${path}`, init}, (resp)=>{
         console.log("[KnowMal] bgFetch response:", resp);
         if(chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
@@ -140,7 +148,7 @@
       const m=label.match(/[^\/\\]+?\.(docx?|xlsx?|pptx?)/i);
       const filename=m?m[0]:"document.bin";
       return { url:a.href, filename, message_id };
-    }catch{ return null; }
+    }catch(e){ return null; }
   }
   function findAttachment(target){
     let n=target;
@@ -174,7 +182,7 @@
     }
     return null;
   }
-  const filenameOnly=(n)=>{ try{ const u=new URL(n, location.origin); return decodeURIComponent(u.pathname.split("/").pop()||n);}catch{ return n; } };
+  const filenameOnly=(n)=>{ try{ const u=new URL(n, location.origin); return decodeURIComponent(u.pathname.split("/").pop()||n);}catch(e){ return n; } };
   function parseIds(href){
     try{
       const u=new URL(href, location.origin);
@@ -183,7 +191,7 @@
         permmsgid: u.searchParams.get("permmsgid") || null,
         message_id: u.searchParams.get("msgid") || null
       };
-    }catch{ return {thread_id:null,permmsgid:null,message_id:null}; }
+    }catch(e){ return {thread_id:null,permmsgid:null,message_id:null}; }
   }
 
   function getFallbackMessageId(){
@@ -225,6 +233,10 @@
 
   function waitOAuthDoneEvent(timeoutMs=180000){
     return new Promise((resolve)=>{
+      if (typeof chrome === 'undefined' || !chrome.runtime) {
+        resolve(false);
+        return;
+      }
       let done=false;
       const timer=setTimeout(()=>{ if(done) return; done=true; chrome.runtime.onMessage.removeListener(onMsg); resolve(false); }, timeoutMs);
       function onMsg(m){
@@ -322,7 +334,7 @@
         method:"POST",
         headers:{ 
           "Content-Type":"application/json", 
-          "X-KM-Ext-Id": chrome.runtime.id,
+          "X-KM-Ext-Id": (typeof chrome !== 'undefined' && chrome.runtime) ? chrome.runtime.id : "unknown",
           "X-KM-Account-Email": getActiveGmailEmail() || undefined
         },
         body: JSON.stringify(payload)
@@ -351,7 +363,7 @@
           method:"POST",
           headers:{ 
             "Content-Type":"application/json", 
-            "X-KM-Ext-Id": chrome.runtime.id,
+            "X-KM-Ext-Id": (typeof chrome !== 'undefined' && chrome.runtime) ? chrome.runtime.id : "unknown",
             "X-KM-Account-Email": getActiveGmailEmail() || undefined
           },
           body: JSON.stringify(payload)
@@ -371,7 +383,7 @@
 
       r = await bgFetch("/gmail/scan", {
         method:"POST",
-        headers:{ "Content-Type":"application/json", "X-KM-Ext-Id": chrome.runtime.id, "X-KM-Account-Email": getActiveGmailEmail() || undefined },
+        headers:{ "Content-Type":"application/json", "X-KM-Ext-Id": (typeof chrome !== 'undefined' && chrome.runtime) ? chrome.runtime.id : "unknown", "X-KM-Account-Email": getActiveGmailEmail() || undefined },
         body: JSON.stringify(payload)
       });
       console.log("[KnowMal] bgFetch response:", r);

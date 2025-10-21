@@ -1,8 +1,13 @@
 (() => {
+  console.log("[KnowMal] content.js loaded on:", window.location.href);
+  
   // const API_BASE = "https://knowmal.duckdns.org";
   const API_BASE = "http://localhost:8000"; //개발용
   const OFFICE_RE = /\.(docx?|xlsx?|pptx?)$/i;
   const EXTRA_FILE_RE = /\.(zip|7z|rar|alz|egg|tar|gz|bz2|xz|pdf|hwp|hwpx|txt|rtf|json|ps1|js|vbs|wsf|jar|apk|ipa|exe|dll|msi|bat|cmd|lnk|scr|iso|img|bin)$/i;
+
+  const isGmailPage = () => window.location.hostname === 'mail.google.com';
+  const isTistoryPage = () => /(^|\.)tistory\.(com|io)$/.test(window.location.hostname) || /kakaocdn\.(net|com)$/.test(window.location.hostname);
 
   const STYLE_ID = "maloffice-style";
   function injectStyles() {
@@ -106,7 +111,6 @@
 
 #mo-overlay .mo-result::after, #mo-overlay .mo-result::before{ content: none !important; display: none !important; }
 #mo-overlay .mo-badge::before{ content:"" !important; }
-
 
 .mo-actions{
   display:flex; gap:16px; justify-content:center; 
@@ -286,21 +290,24 @@
     $btnOpen.onclick = null;
     if ($btnDownload){ $btnDownload.disabled = false; }
   }
+  
   function setMsg(t, type = "processing"){ 
     $msg.textContent = t; 
     $msg.className = `mo-msg ${type}`;
   }
+  
   function setProgress(pct){ 
+    // Progress bar implementation if needed
   }
+  
   function setBadge(text, kind){
     if (!$badge) return; 
     $badge.className = `mo-badge ${kind}`;
     $badge.textContent = text;
   }
+  
   function setResult(kind){
-    if (!$result) {
-      return;
-    }
+    if (!$result) return;
     if (!kind){ 
       $result.style.display = "none"; 
       $result.className = "mo-result"; 
@@ -332,6 +339,7 @@
         </div>`;
     }
   }
+  
   function setStep(state){
     const steps = [
       ["대기", document.getElementById("mo-step-wait")],
@@ -347,15 +355,9 @@
       if (name === state){ el.classList.add("active"); }
     }
   }
+  
   function setDone(reportUrl, status){
     console.log("[KnowMal] setDone 호출됨 - status:", status);
-    if (status === "safe") {
-      console.log("[KnowMal] 정상 파일로 판정");
-    } else if (status === "danger") {
-      console.log("[KnowMal] 악성 파일로 판정");
-    } else {
-      console.log("[KnowMal] 상태 불명");
-    }
     $msg.style.display = "none";
     setProgress(100);
     setStep("완료");
@@ -366,7 +368,7 @@
         if (status === "safe") doneEl.classList.add("status-safe");
         if (status === "danger") doneEl.classList.add("status-danger");
       }
-    }catch{}
+    }catch(e){}
     $btnOpen.disabled = false;
     console.log("리포트 URL:", reportUrl);
     $btnOpen.onclick = () => {
@@ -379,7 +381,7 @@
     }
     try{
       const u = new URL(reportUrl);
-      const urlStatus = u.searchParams.get("status"); // safe | danger
+      const urlStatus = u.searchParams.get("status");
       if (urlStatus === "safe" || urlStatus === "danger"){ 
         console.log("[KnowMal] URL에서 추출한 상태로 setResult 호출 - urlStatus:", urlStatus);
         setResult(urlStatus);
@@ -389,7 +391,7 @@
           doneEl.classList.add(urlStatus === "safe" ? "status-safe" : "status-danger");
         }
       }
-    }catch{}
+    }catch(e){}
     
     if (!status) {
       console.log("[KnowMal] 상태 불명, 기본적으로 정상으로 처리");
@@ -401,11 +403,12 @@
         try{
           const urlToOpen = lastDownloadUrl;
           if (urlToOpen){ window.open(urlToOpen, "_blank", "noopener,noreferrer"); }
-        }catch{}
+        }catch(e){}
       };
       $btnDownload.disabled = false;
     }
   }
+  
   function resetModalState(){
     if ($result) {
       $result.style.display = "none";
@@ -428,11 +431,10 @@
       if (doneEl){
         doneEl.classList.remove("status-safe","status-danger");
       }
-    }catch{}
+    }catch(e){}
   }
 
   function setError(text){
-    
     if (text && text.includes("Extension context invalidated")) {
       setMsg("확장 프로그램이 일시적으로 비활성화되었습니다. 페이지를 새로고침하고 다시 시도해주세요.", "error");
     } else {
@@ -499,6 +501,83 @@
     });
   }
 
+  function bgSend(type, payload={}){
+    return new Promise((resolve,reject)=>{
+      chrome.runtime.sendMessage({type, ...payload}, (resp)=>{
+        if(chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+        resolve(resp);
+      });
+    });
+  }
+
+  function parseDownloadUrlAttr(node){
+    const raw=node.getAttribute?.("download_url"); 
+    if(!raw) return null;
+    const parts=raw.split(":"); 
+    const url=parts.slice(2).join(":"); 
+    const filename=parts[1]||"";
+    
+    let message_id = "";
+    try {
+      const u = new URL(url);
+      message_id = u.searchParams.get("th") || "";
+      console.log("[KnowMal] Found message_id from download_url:", message_id);
+    } catch (e) {
+      console.log("[KnowMal] Failed to parse download_url:", e);
+    }
+    
+    return { url, filename, message_id };
+  }
+
+  function extractFromHref(a){
+    try{
+      const u=new URL(a.href, location.origin);
+      const looks = u.hostname.includes("mail.google.com") && (u.search.includes("attid=")||u.search.includes("view=att")||u.search.includes("disp=safe"));
+      if(!looks) return null;
+
+      const message_id = u.searchParams.get("th") || "";
+      console.log("[KnowMal] Found message_id from href:", message_id);
+      
+      const label=(a.getAttribute("aria-label")||a.textContent||"").trim();
+      const m=label.match(/[^\/\\]+?\.(docx?|xlsx?|pptx?|zip|7z|rar|pdf|hwp|exe|dll)/i);
+      const filename=m?m[0]:"document.bin";
+      return { url:a.href, filename, message_id };
+    }catch(e){ return null; }
+  }
+
+  function findGmailAttachment(target){
+    let n=target;
+    for(let i=0;i<8 && n;i++){ 
+      const info=parseDownloadUrlAttr(n); 
+      if(info && (OFFICE_RE.test(info.filename) || EXTRA_FILE_RE.test(info.filename))) {
+        console.log("[KnowMal] Found attachment via download_url:", info);
+        return info; 
+      }
+      n=n.parentElement; 
+    }
+    const a=target.closest?.("a");
+    if(a){
+      const info2=extractFromHref(a); 
+      if(info2 && (OFFICE_RE.test(info2.filename) || EXTRA_FILE_RE.test(info2.filename))) {
+        console.log("[KnowMal] Found attachment via href:", info2);
+        return info2;
+      }
+      const txt=(a.textContent||a.getAttribute("aria-label")||"").trim().toLowerCase();
+      if(OFFICE_RE.test(txt) || EXTRA_FILE_RE.test(txt)) {
+        let message_id = "";
+        try {
+          const u = new URL(a.href, location.origin);
+          message_id = u.searchParams.get("th") || "";
+        } catch (e) {
+        }
+        const result = { url:a.href, filename: txt.match(/[^\/\\]+?\.(docx?|xlsx?|pptx?|zip|7z|rar|pdf|hwp|exe|dll)/i)?.[0] || "document.bin", message_id };
+        console.log("[KnowMal] Found attachment via text match:", result);
+        return result;
+      }
+    }
+    return null;
+  }
+
   const getCookies = () => document.cookie || "";
   const getPageUrl = () => location.href;
 
@@ -508,38 +587,81 @@
       const name = decodeURIComponent(u.pathname.split("/").pop() || "").toLowerCase();
       const textMatch = OFFICE_RE.test(aEl.textContent || "");
       const nameMatch = OFFICE_RE.test(name);
+      
+      if (nameMatch || textMatch) {
+        console.log("[KnowMal] isOfficeLink check: OFFICE FILE MATCH", {
+          href: aEl.href,
+          name: name,
+          textContent: aEl.textContent,
+          nameMatch: nameMatch,
+          textMatch: textMatch,
+          result: true
+        });
+        return true;
+      }
+      if (isGmailPage()) {
+        const isGmailAttachment = u.hostname.includes("mail.google.com") && 
+          (u.search.includes("attid=") || u.search.includes("view=att") || u.search.includes("disp=safe"));
+        if (isGmailAttachment) {
+          const label = (aEl.getAttribute("aria-label") || aEl.textContent || "").trim();
+          const hasOfficeOrExtraFile = OFFICE_RE.test(label) || EXTRA_FILE_RE.test(label);
+          console.log("[KnowMal] Gmail attachment check:", {
+            href: aEl.href,
+            label: label,
+            hasOfficeOrExtraFile: hasOfficeOrExtraFile,
+            result: hasOfficeOrExtraFile
+          });
+          return hasOfficeOrExtraFile;
+        }
+      }
+      
+      const host = (u.hostname || "").toLowerCase();
+      const extraFileMatch = EXTRA_FILE_RE.test(name);
+      const textExtraFileMatch = EXTRA_FILE_RE.test(aEl.textContent || "");
+      const isTistoryHost = /(^|\.)tistory\.(com|io)$/.test(host) || /kakaocdn\.(net|com)$/.test(host);
+      const pathHint = /attach|attachment|file|download/gi.test(u.pathname);
+      
+      const result = extraFileMatch || textExtraFileMatch || (isTistoryHost && pathHint);
+      
       console.log("[KnowMal] isOfficeLink check:", {
         href: aEl.href,
         name: name,
         textContent: aEl.textContent,
         nameMatch: nameMatch,
         textMatch: textMatch,
-        result: nameMatch || textMatch
+        extraFileMatch: extraFileMatch,
+        textExtraFileMatch: textExtraFileMatch,
+        isTistoryHost: isTistoryHost,
+        pathHint: pathHint,
+        result: result
       });
-      return nameMatch || textMatch;
+      
+      return result;
     }catch(e){ 
       console.log("[KnowMal] isOfficeLink error:", e);
       return false; 
     }
-      const host = (u.hostname || "").toLowerCase();
-      const looksLikeTarget = OFFICE_RE.test(name) || OFFICE_RE.test(aEl.textContent || "");
-      const looksLikeFile = looksLikeTarget || EXTRA_FILE_RE.test(name);
-      const isTistoryHost = /(^|\.)tistory\.(com|io)$/.test(host) || /kakaocdn\.(net|com)$/.test(host);
-      const pathHint = /attach|attachment|file|download/gi.test(u.pathname);
-      return looksLikeFile || (isTistoryHost && pathHint);
-    }catch{ return false; }
   }
 
   function guessFilename(aEl){
-    const fig = aEl.closest("figure.fileblock");
+    if (!aEl) return "document.bin";
+    
+    if (isGmailPage()) {
+      const label = (aEl.getAttribute?.("aria-label") || aEl.textContent || "").trim();
+      const match = label.match(/([^\/\\]+\.(docx?|xlsx?|pptx?|zip|7z|rar|pdf|hwp|exe|dll|bin))/i);
+      if (match) return match[1];
+    }
+    
+    const fig = aEl.closest?.("figure.fileblock");
     if (fig){
       const nameEl = fig.querySelector(".filename .name");
       if (nameEl?.textContent) return nameEl.textContent.trim();
     }
+    
     try{
       const u = new URL(aEl.href);
       return decodeURIComponent(u.pathname.split("/").pop() || "document.bin");
-    }catch{ return "document.bin"; }
+    }catch(e){ return "document.bin"; }
   }
 
   function findDownloadAnchorOrUrl(target){
@@ -560,48 +682,220 @@
   }
 
   function cancelEvent(e){
-    try{ e.preventDefault(); }catch{}
-    try{ e.stopImmediatePropagation?.(); }catch{}
-    try{ e.stopPropagation(); }catch{}
+    try{ e.preventDefault(); }catch(e){}
+    try{ e.stopImmediatePropagation?.(); }catch(e){}
+    try{ e.stopPropagation(); }catch(e){}
   }
 
-  async function handleClick(e){
-    
-    console.log("[KnowMal] Click detected on:", e.target);
-    const a = e.target.closest?.("a");
-    if (!a || !a.href) {
-        console.log("[KnowMal] No link found or no href");
-        return;
-    }
-    console.log("[KnowMal] Link found:", a.href, "text:", a.textContent);
+  function getActiveGmailEmail(){
+    try{
+      const imgAlt = document.querySelector('a[aria-label^="Google 계정:"] img')?.alt
+        || document.querySelector('a[aria-label*="Google Account:"] img')?.alt
+        || "";
+      const m1 = imgAlt && imgAlt.match(/\(([^)]+)\)\s*$/);
+      if (m1 && m1[1]) return m1[1].trim();
 
-    if (!isOfficeLink(a)) {
-        console.log("[KnowMal] Not an office link");
-        return;
-    }
+      const al = document.querySelector('a[aria-label^="Google 계정:"]')?.getAttribute('aria-label')
+        || document.querySelector('a[aria-label*="Google Account:"]')?.getAttribute('aria-label')
+        || "";
+      const m2 = al && al.match(/\(([^)]+)\)\s*$/);
+      if (m2 && m2[1]) return m2[1].trim();
 
-    console.log("[KnowMal] Office link detected, starting flow");
-    e.preventDefault();
-    e.stopPropagation();
+      const title = document.querySelector('a[title*="@"]')?.getAttribute('title') || "";
+      const m3 = title && title.match(/([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i);
+      if (m3 && m3[1]) return m3[1].trim();
 
-    const found = findDownloadAnchorOrUrl(e.target);
-    if (!found || !found.href) return;
+      const btnTxt = document.querySelector('a[aria-label*="@"]')?.getAttribute('aria-label') || "";
+      const m4 = btnTxt && btnTxt.match(/([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i);
+      if (m4 && m4[1]) return m4[1].trim();
+    }catch(e){}
+    return "";
+  }
 
-    const fakeA = {
-        href: found.href,
-        textContent: found.anchor?.textContent || ""
-    };
-    if (!isOfficeLink(fakeA)) return;
+  function getFallbackMessageId(){
+    try{
+      const el = document.querySelector('[data-legacy-message-id], [data-message-id]');
+      const id1 = el?.getAttribute('data-legacy-message-id') || el?.getAttribute('data-message-id');
+      if (id1) return id1;
+      const u = new URL(location.href);
+      const id2 = u.searchParams.get('msgid') || u.searchParams.get('th') || u.searchParams.get('message_id');
+      if (id2) return id2;
+    }catch(e){}
+    return "";
+  }
 
+  function parseIds(href){
+    try{
+      const u=new URL(href, location.origin);
+      return {
+        thread_id: u.searchParams.get("th") || u.searchParams.get("threadId") || null,
+        permmsgid: u.searchParams.get("permmsgid") || null,
+        message_id: u.searchParams.get("msgid") || null
+      };
+    }catch(e){ return {thread_id:null,permmsgid:null,message_id:null}; }
+  }
+
+  const filenameOnly=(n)=>{ 
+    try{ 
+      const u=new URL(n, location.origin); 
+      return decodeURIComponent(u.pathname.split("/").pop()||n);
+    }catch(e){ return n; } 
+  };
+
+  async function ensureOAuth() {
     try {
-        console.debug("[KnowMal] final download href:", found.href);
-    } catch {}
+      const pageEmail = getActiveGmailEmail();
+      const res = await bgSend("KM_OAUTH_STATUS", { email: pageEmail });
+      if(res?.ok && res?.authed) {
+        console.log("[KnowMal] OAuth already authenticated in DB");
+        try{
+          const gmailEmail = pageEmail;
+          const serverEmail = res?.email || "";
+          if (gmailEmail && serverEmail && gmailEmail.toLowerCase() !== serverEmail.toLowerCase()){
+            console.warn("[KnowMal] Gmail page account != server account", { gmailEmail, serverEmail });
+            await chrome.storage.local.remove(["KM_OAUTH_READY"]);
+            const f = await bgSend("KM_OAUTH_ENSURE_FORCE");
+            if(!(f?.ok && (f?.authed || f?.authorized))) throw new Error("계정 전환 재인증 실패");
+          }
+        }catch(e){ console.log("[KnowMal] account compare skipped:", e); }
+        await chrome.storage.local.set({ KM_OAUTH_READY: true });
+        return true;
+      }
+      try { await chrome.storage.local.remove(["KM_OAUTH_READY"]); } catch(e) {}
+    } catch (e) {
+      console.log("[KnowMal] DB OAuth check failed:", e);
+    }
 
-    cancelEvent(e);
-    lastDownloadUrl = found.href;
+    console.log("[KnowMal] No OAuth in DB, starting OAuth flow");
+    const res = await bgSend("KM_OAUTH_ENSURE", { email: getActiveGmailEmail() });
+    if(!res?.ok) throw new Error(res?.error || "OAuth 시작 실패");
+    if(res.authed || res.authorized) {
+      console.log("[KnowMal] OAuth completed");
+      return true;
+    }
+    
+    setMsg("Google 동의 창에서 인증을 완료하세요…"); 
+    setProgress(35);
 
-    showOverlay();
+    // Wait for OAuth completion
+    const race = await Promise.race([
+      (async()=>{ 
+        const deadline=Date.now()+180000;
+        while(Date.now()<deadline){
+          await new Promise(r=>setTimeout(r,1000));
+          const s=await bgSend("KM_OAUTH_STATUS", { email: getActiveGmailEmail() });
+          if(s?.ok && s?.authed) return true;
+        }
+        return false;
+      })(),
+      new Promise(resolve => {
+        let done=false;
+        const timer=setTimeout(()=>{ if(done) return; done=true; resolve(false); }, 180000);
+        function onMsg(m){
+          if(m?.type==="KM_OAUTH_DONE" && !done){
+            done=true; clearTimeout(timer); chrome.runtime.onMessage.removeListener(onMsg); resolve(true);
+          }
+        }
+        chrome.runtime.onMessage.addListener(onMsg);
+      })
+    ]);
+    if(!race) throw new Error("OAuth 시간 초과");
+    await new Promise(r=>setTimeout(r, 300));
+    return true;
+  }
 
+  async function forceReauthIfNeeded(error){
+    const msgText = String(error?.message || error || "");
+    if (/401|not linked|unauthorized/i.test(msgText)){
+      console.warn("[KnowMal] Detected unauthorized, forcing OAuth");
+      try{
+        await chrome.storage.local.remove(["KM_OAUTH_READY"]);
+        const res = await bgSend("KM_OAUTH_ENSURE_FORCE");
+        if(res?.ok && (res.authed || res.authorized)) return true;
+      }catch(e){}
+    }
+    return false;
+  }
+
+  // Gmail scan handler
+  async function handleGmailScan(attachment) {
+    setMsg("Gmail 첨부 파일 분석 요청…"); 
+    setProgress(60);
+    
+    const ids=parseIds(attachment.url);
+    const message_id = attachment.message_id || ids.message_id || ids.thread_id || getFallbackMessageId();
+    console.log("[KnowMal] Using message_id:", message_id, "from att:", attachment.message_id, "from parseIds:", ids.message_id);
+    
+    if (!message_id) {
+      console.warn("[KnowMal] message_id fallback failed; scan may return 400. Continuing.");
+    }
+
+    const payload={
+      message_id:message_id,
+      filename:filenameOnly(attachment.filename)
+    };
+    console.log("[KnowMal] Sending scan request with payload:", payload);
+    
+    try {
+      const response = await fetch(`${API_BASE}/gmail/scan`, {
+        method:"POST",
+        headers:{ 
+          "Content-Type":"application/json", 
+          "X-KM-Ext-Id": chrome.runtime.id,
+          "X-KM-Account-Email": getActiveGmailEmail() || undefined
+        },
+        body: JSON.stringify(payload)
+      });
+      console.log("[KnowMal] Direct fetch response status:", response.status);
+      const r_json = await response.json();
+      console.log("[KnowMal] Direct fetch response:", r_json);
+      
+      if (response.ok) {
+        let reportUrl = r_json.report_url || r_json.reportUrl || r_json.url;
+        if (reportUrl) {
+          if (reportUrl.includes('https://localhost')) {
+            reportUrl = reportUrl.replace('https://localhost', 'http://localhost');
+          }
+          console.log("[KnowMal] Using report URL:", reportUrl);
+          setMsg("검사 완료"); 
+          setProgress(100); 
+          setDone(reportUrl);
+          return;
+        }
+      }
+      throw new Error(`HTTP ${response.status}: ${r_json.detail || r_json.error || 'Unknown error'}`);
+    } catch (e) {
+      console.log("[KnowMal] Direct fetch failed, trying reauth:", e);
+      const reauthed = await forceReauthIfNeeded(e);
+      if (reauthed){
+        const response2 = await fetch(`${API_BASE}/gmail/scan`, {
+          method:"POST",
+          headers:{ 
+            "Content-Type":"application/json", 
+            "X-KM-Ext-Id": chrome.runtime.id,
+            "X-KM-Account-Email": getActiveGmailEmail() || undefined
+          },
+          body: JSON.stringify(payload)
+        });
+        if (response2.ok){
+          const r2 = await response2.json();
+          let reportUrl2 = r2.report_url || r2.reportUrl || r2.url;
+          if (reportUrl2){
+            if (reportUrl2.includes('https://localhost')) {
+              reportUrl2 = reportUrl2.replace('https://localhost', 'http://localhost');
+            }
+            setMsg("검사 완료"); 
+            setProgress(100);
+            setDone(reportUrl2);
+            return;
+          }
+        }
+      }
+      throw e;
+    }
+  }
+
+  async function handleTistoryScan(found) {
     const payload = {
       url: found.href,
       filename: guessFilename(found.anchor || { href: found.href, closest: () => null, textContent: "" }),
@@ -619,7 +913,6 @@
 
       const r1_json = await r1.json();
       if (!r1.ok || !r1_json.id) throw new Error(r1_json?.detail || "fetch_url 실패");
-      if (!r1?.ok || !r1.id) throw new Error(r1?.detail || "fetch_url 실패");
 
       setMsg("파일의 악성 행위를 검사 중입니다.");
       setProgress(70);
@@ -631,48 +924,47 @@
       const r2_json = await r2.json();
       if (!r2.ok || !r2_json.report_url) throw new Error(r2_json?.detail || "share 실패");
 
-      setDone(r2_json.report_url);
-      const r2 = await bgFetch(`/share/create?file_id=${encodeURIComponent(r1.id)}`, { method: "POST" });
-      if (!r2?.ok || !r2.report_url) throw new Error(r2?.detail || "share 실패");
-      
       let norm = "";
-      if (r2.status) {
-        console.log("[KnowMal] 응답에서 상태 추출:", r2.status);
-        const statusLower = String(r2.status).toLowerCase();
-        norm = 
-          /(safe|정상|clean|benign)/.test(statusLower) ? "safe" :
-          /(mal|malicious|virus|trojan|infected|danger|위험)/.test(statusLower) ? "danger" : "";
+      if (r2_json.status) {
+        console.log("[KnowMal] 응답에서 상태 추출:", r2_json.status);
+        const statusLower = String(r2_json.status).toLowerCase();
+        norm = /(safe|정상|clean|benign)/.test(statusLower)
+          ? "safe"
+          : /(mal|malicious|virus|trojan|infected|danger|위험)/.test(statusLower)
+          ? "danger"
+          : "";
       }
-      
       if (!norm) {
-        try{
-          const u = new URL(r2.report_url);
+        try {
+          const u = new URL(r2_json.report_url);
           const urlStatus = u.searchParams.get("status");
           if (urlStatus) {
-            console.log("[KnowMal] URL에서 상태 추출:", urlStatus);
             const urlStatusLower = urlStatus.toLowerCase();
-            norm = 
-              /(safe|정상|clean|benign)/.test(urlStatusLower) ? "safe" :
-              /(mal|malicious|virus|trojan|infected|danger|위험)/.test(urlStatusLower) ? "danger" : "";
+            norm = /(safe|정상|clean|benign)/.test(urlStatusLower)
+              ? "safe"
+              : /(mal|malicious|virus|trojan|infected|danger|위험)/.test(urlStatusLower)
+              ? "danger"
+              : "";
           }
-        }catch{}
+        } catch (e) {}
       }
-      
       console.log("[KnowMal] 상태 감지 - 최종 결과:", norm);
-      setDone(r2.report_url, norm);
+      setDone(r2_json.report_url, norm);
     }catch(err){
+      // Fallback to direct upload
       try{
         setMsg("파일의 악성 행위를 검사 중입니다.");
         setProgress(40);
 
-        const bin = await bgFetchBinary(found.href, {
+        const response = await fetch(found.href, {
+          method: "GET",
           credentials: "include",
           referrer: getPageUrl(),
           referrerPolicy: "strict-origin-when-cross-origin",
           headers: { "Referer": getPageUrl() }
         });
-        if (!bin?.ok){ throw new Error(`원본 다운로드 실패: HTTP ${bin?.status}`); }
-        const ab = bin.buffer;
+        if (!response.ok){ throw new Error(`원본 다운로드 실패: HTTP ${response.status}`); }
+        const ab = await response.arrayBuffer();
         const fd = new FormData();
         const fileBlob = new Blob([ab]);
         fd.append("file", fileBlob, guessFilename(found.anchor || { href: found.href, closest: ()=>null, textContent: "" }));
@@ -707,7 +999,7 @@
                 /(safe|정상|clean|benign)/.test(urlStatusLower) ? "safe" :
                 /(mal|malicious|virus|trojan|infected|danger|위험)/.test(urlStatusLower) ? "danger" : "";
             }
-          }catch{}
+          }catch(e){}
         }
         
         setDone(shJson.report_url, norm2);
@@ -717,8 +1009,76 @@
     }
   }
 
+  async function handleClick(e){
+    console.log("[KnowMal] Click detected on:", e.target);
+    
+    if (isGmailPage()) {
+      const attachment = findGmailAttachment(e.target);
+      if (attachment) {
+        console.log("[KnowMal] Gmail attachment detected, starting flow");
+        e.preventDefault();
+        e.stopPropagation();
+        
+        showOverlay();
+        try {
+          await ensureOAuth();
+          setMsg("인증 확인 완료. 분석을 시작합니다…"); 
+          setProgress(45);
+          await handleGmailScan(attachment);
+        } catch(error) {
+          console.warn("[KnowMal] Gmail flow error", error);
+          setError(error?.message || String(error));
+        }
+        return;
+      }
+    }
+    
+    const a = e.target.closest?.("a");
+    if (!a || !a.href) {
+      console.log("[KnowMal] No link found or no href");
+      return;
+    }
+    console.log("[KnowMal] Link found:", a.href, "text:", a.textContent);
+
+    if (!isOfficeLink(a)) {
+      console.log("[KnowMal] Not an office link");
+      return;
+    }
+
+    console.log("[KnowMal] Office link detected, starting flow");
+    e.preventDefault();
+    e.stopPropagation();
+
+    const found = findDownloadAnchorOrUrl(e.target);
+    if (!found || !found.href) return;
+
+    const fakeA = {
+      href: found.href,
+      textContent: found.anchor?.textContent || ""
+    };
+    if (!isOfficeLink(fakeA)) return;
+
+    try {
+      console.debug("[KnowMal] final download href:", found.href);
+    } catch (e) {}
+
+    cancelEvent(e);
+    lastDownloadUrl = found.href;
+
+    showOverlay();
+    
+    try {
+      await handleTistoryScan(found);
+    } catch(error) {
+      console.warn("[KnowMal] Tistory flow error", error);
+      setError(error?.message || String(error));
+    }
+  }
+
   const captureOpts = { capture: true, passive: false };
   const bubbleOpts = { capture: false, passive: false };
   window.addEventListener("click", handleClick, bubbleOpts);
   window.addEventListener("auxclick", handleClick, bubbleOpts);
+  
+  console.log("[KnowMal] Content script ready for", isGmailPage() ? "Gmail" : "Tistory");
 })();
