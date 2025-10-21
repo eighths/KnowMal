@@ -330,11 +330,9 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
     except Exception as e:
         logger.error(f"파일 분석 중 오류 발생: {e}")
 
-    # 분석 결과를 바탕으로 상태 결정
     status = "unknown"
     
     try:
-        # 압축 파일의 경우 내부 파일 우선 검사
         if analysis_result and analysis_result.get('embedded_files'):
             embedded_files = analysis_result['embedded_files']
             logger.info(f"압축 파일 내부 파일 검사 시작: {len(embedded_files)}개 파일")
@@ -343,7 +341,6 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
                 item_report = item.get('report', {})
                 item_filename = item.get('filename', f'파일{i+1}')
                 
-                # 내부 파일의 VT 결과 확인 - 하나라도 탐지되면 바로 위험
                 item_vt = item_report.get('virustotal', {})
                 if item_vt.get('available') and item_vt.get('scan_summary', {}).get('malicious', 0) > 0:
                     vt_malicious = item_vt['scan_summary']['malicious']
@@ -352,7 +349,6 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
                     logger.info(f"내부 파일 VT 탐지로 위험 판정: {item_filename} ({vt_malicious}/{vt_total} 탐지)")
                     break
                 
-                # 내부 파일의 AI 결과 확인 - 하나라도 Normal이 아니면 바로 위험
                 item_ai = item_report.get('ai_prediction', {})
                 if item_ai and item_ai.get('ai_analysis', {}).get('predicted_types'):
                     item_types = item_ai['ai_analysis']['predicted_types']
@@ -362,12 +358,10 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
                         logger.info(f"내부 파일 AI 예측으로 위험 판정: {item_filename} (위험 유형: {dangerous_types})")
                         break
             
-            # 모든 내부 파일이 안전한 경우
             if status == "unknown":
                 status = "safe"
                 logger.info(f"모든 내부 파일 안전 확인 - 압축 파일 안전 판정")
                 
-        # 일반 파일의 경우 - VirusTotal 결과 확인
         elif virustotal_result and virustotal_result.get('available'):
             scan_summary = virustotal_result.get('scan_summary', {})
             malicious = scan_summary.get('malicious', 0)
@@ -375,13 +369,12 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
             
             if total > 0:
                 detection_rate = malicious / total
-                if malicious > 0:  # 하나라도 탐지되면 위험
+                if malicious > 0:  
                     status = "danger"
                 else:
                     status = "safe"
                 logger.info(f"VT 기반 상태 결정: {status} (탐지: {malicious}/{total})")
         
-        # 일반 파일의 경우 - AI 예측 결과 확인
         elif ai_prediction and ai_prediction.get('ai_analysis'):
             predicted_types = ai_prediction['ai_analysis'].get('predicted_types', [])
             dangerous_types = [t for t in predicted_types if t != 'Normal']
@@ -393,7 +386,6 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
                 status = "safe"
                 logger.info(f"AI 기반 상태 결정: {status}")
         
-        # 기본값: 분석 결과가 있으면 안전으로 간주
         elif analysis_result:
             status = "safe"
             logger.info(f"기본 상태 결정: {status}")
@@ -413,7 +405,7 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
         "analysis_report": analysis_result,
         "ai_prediction": ai_prediction,
         "virustotal": virustotal_result,
-        "status": status  # 크롬 익스텐션이 필요로 하는 필드
+        "status": status  
     }
     
     logger.info(f"공유 링크 생성을 위해 file_id {new_id} 반환")
