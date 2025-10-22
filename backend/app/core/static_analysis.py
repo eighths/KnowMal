@@ -37,11 +37,13 @@ def _sha256_of_file(path: str) -> str:
 
 
 def sniff_mime(path: str | None = None, file_bytes: bytes | None = None) -> str:
-    m = magic.Magic(mime=True)
-    if file_bytes is not None:
-        return m.from_buffer(file_bytes)
-    elif path:
-        return m.from_file(path)
+    try:
+        if file_bytes is not None:
+            return magic.from_buffer(file_bytes, mime=True)
+        elif path:
+            return magic.from_file(path, mime=True)
+    except Exception:
+        return "application/octet-stream"
     raise ValueError("sniff_mime: path or file_bytes required")
 
 def extract_excerpt(path: str = None, mime: str = None, max_len: int = 4000, file_bytes: bytes = None) -> str:

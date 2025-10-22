@@ -186,6 +186,10 @@ def scan(
     file_bytes = base64.urlsafe_b64decode(data64 + "===")
 
     report_url = None
+    analysis_result = None
+    ai_prediction = None
+    virustotal_result = None
+    
     try:
         from app.db.models import FileRecord
         from app.cache.redis_client import get_redis
@@ -229,7 +233,6 @@ def scan(
             include_virustotal=True
         )
 
-        ai_prediction = None
         try:
             ai_model_service = get_ai_model_service()
             if ai_model_service.model_loaded:
@@ -238,7 +241,6 @@ def scan(
         except Exception as e:
             print(f"Gmail AI 예측 실패: {e}")
 
-        virustotal_result = None
         try:
             print(f"[GMAIL] VirusTotal 조회 시작: {fname} (SHA256: {sha256[:16]}...)")
             vt_client = get_virustotal_client()
