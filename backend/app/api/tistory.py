@@ -12,6 +12,8 @@ from app.db import get_db
 from app.config import get_settings
 from app.core.static_analysis import analyze_bytes
 from app.services.ai_model_service import get_ai_model_service
+from app.services.ensemble_model_service import get_ensemble_model_service
+from app.services.gemini_service import get_gemini_service
 from app.external.virustotal import get_virustotal_client
 from app.cache.redis_client import get_redis
 from app.cache.keys import file_data_key
@@ -235,35 +237,72 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
                 logger.info(f"분석 결과 확인: {filename}")
                 logger.info(f"Features 키: {list(analysis_result.get('features', {}).keys())}")
                 
-                ai_model_service = get_ai_model_service()
-                if ai_model_service.model_loaded:
-                    # 1) 상위(컨테이너/단일 파일)에 대한 예측
-                    ai_prediction = ai_model_service.predict_malware_type(analysis_result)
-                    if ai_prediction:
-                        logger.info(f"AI 예측 완료: {filename}")
+                ensemble_model_service = get_ensemble_model_service()
+                if ensemble_model_service.model_loaded:
+                    # 일반 파일인 경우
+                    if 'embedded_files' not in analysis_result:
+                        logger.info(f"[TISTORY] 일반 파일 AI 예측 시작")
+                        try:
+                            ai_prediction = ensemble_model_service.predict_malware_type(analysis_result)
+                            if ai_prediction:
+                                analysis_result['ai_prediction'] = ai_prediction
+                                logger.info(f"[TISTORY] 일반 파일 AI 예측 완료")
+                                
+                                # Gemini 설명 생성
+                                try:
+                                    gemini_service = get_gemini_service()
+                                    if gemini_service and gemini_service.initialized:
+                                        virustotal_for_gemini = virustotal_result
+                                        feature_importance = ai_prediction.get("ai_analysis", {}).get("model_info", {}).get("enhanced_features", {}).get("feature_importance")
+                                        
+                                        logger.info(f"✅ [TISTORY] Gemini 호출 시작")
+                                        gemini_explanation = gemini_service.explain(ai_prediction, virustotal_for_gemini, feature_importance)
+                                        if gemini_explanation:
+                                            logger.info(f"✅ [TISTORY] Gemini 설명 생성 완료")
+                                            analysis_result["gemini_explanation"] = gemini_explanation
+                                        else:
+                                            logger.warning(f"⚠️ [TISTORY] Gemini 설명이 비어있음")
+                                except Exception as ge:
+                                    logger.error(f"❌ [TISTORY] Gemini failed: {ge}")
+                        except Exception as e:
+                            logger.error(f"[TISTORY] 일반 파일 AI 예측 실패: {e}")
+                    
+                    # 압축 파일 내부 파일들에 대한 예측
                     else:
-                        logger.warning(f"AI 예측 실패: {filename}")
-
-                    # 2) 압축 파일 내부 파일들에 대한 예측 포함
-                    try:
-                        if analysis_result.get('embedded_files'):
-                            for idx, item in enumerate(analysis_result.get('embedded_files') or []):
-                                child_report = (item or {}).get('report') or {}
-                                if isinstance(child_report, dict) and not child_report.get('ai_prediction'):
-                                    try:
-                                        child_pred = ai_model_service.predict_malware_type(child_report)
-                                        if child_pred:
-                                            child_report['ai_prediction'] = child_pred
-                                            item['report'] = child_report
-                                            logger.info(f"내부 파일 AI 예측 추가: index={idx}, name={item.get('filename')}")
-                                    except Exception as ce:
-                                        logger.warning(f"내부 파일 AI 예측 실패(index={idx}): {ce}")
-                    except Exception as ie:
-                        logger.warning(f"내부 파일 AI 예측 처리 중 오류: {ie}")
+                        logger.info(f"[TISTORY] 압축 파일 내부 파일들 AI 예측 시작")
+                        for idx, item in enumerate(analysis_result.get('embedded_files') or []):
+                            child_report = (item or {}).get('report') or {}
+                            if isinstance(child_report, dict):
+                                try:
+                                    child_pred = ensemble_model_service.predict_malware_type(child_report)
+                                    if child_pred:
+                                        child_report['ai_prediction'] = child_pred
+                                        item['report'] = child_report
+                                        logger.info(f"[TISTORY] 내부 파일 {idx+1} AI 예측 완료")
+                                        
+                                        # 내부 파일 Gemini 설명 생성
+                                        try:
+                                            gemini_service = get_gemini_service()
+                                            if gemini_service and gemini_service.initialized:
+                                                child_hash = child_report.get('file', {}).get('hash', {}).get('sha256', sha_hex)
+                                                child_vt = child_report.get('virustotal')
+                                                feature_importance = child_pred.get("ai_analysis", {}).get("model_info", {}).get("enhanced_features", {}).get("feature_importance")
+                                                
+                                                logger.info(f"✅ [TISTORY] 내부 파일 Gemini 호출 시작")
+                                                gemini_explanation = gemini_service.explain(child_pred, child_vt, feature_importance)
+                                                if gemini_explanation:
+                                                    logger.info(f"✅ [TISTORY] 내부 파일 Gemini 설명 생성 완료")
+                                                    child_report["gemini_explanation"] = gemini_explanation
+                                                    item['report'] = child_report
+                                        except Exception as ge:
+                                            logger.error(f"❌ [TISTORY] 내부 파일 Gemini failed: {ge}")
+                                except Exception as ce:
+                                    logger.warning(f"[TISTORY] 내부 파일 AI 예측 실패(index={idx}): {ce}")
+                        logger.info(f"[TISTORY] 압축 파일 내부 파일들 AI 예측 완료")
                 else:
-                    logger.warning("AI 모델이 로드되지 않음")
+                    logger.warning("[TISTORY] Ensemble 모델이 로드되지 않음")
             except Exception as e:
-                logger.error(f"AI 예측 중 오류: {e}")
+                logger.error(f"[TISTORY] AI 예측 중 오류: {e}")
         else:
             logger.warning(f"분석 결과가 없음: {filename}")
         
@@ -316,6 +355,11 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
             logger.error(f"[TISTORY] VirusTotal 조회 중 오류: {e}")
             virustotal_result = None
         
+        # gemini_explanation 추출 (일반 파일 또는 압축 파일 최상위 레벨)
+        gemini_explanation = None
+        if analysis_result and isinstance(analysis_result, dict):
+            gemini_explanation = analysis_result.get("gemini_explanation")
+        
         cache_data = {
             "filename": filename,
             "mime_type": mime,
@@ -324,7 +368,8 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
             "file_id": new_id,
             "analysis_report": analysis_result,
             "ai_prediction": ai_prediction,
-            "virustotal": virustotal_result
+            "virustotal": virustotal_result,
+            "gemini_explanation": gemini_explanation
         }
         
         redis_client = get_redis()
