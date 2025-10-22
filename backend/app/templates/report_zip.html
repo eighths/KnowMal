@@ -460,7 +460,7 @@
               <!-- 왼쪽: 원형 그래프 (VirusTotal 결과) -->
               <div class="virus-total-circle">
                 <div class="circular-progress is-normal" data-percentage="0">
-                  <svg class="progress-ring" width="180" height="180">
+                  <svg class="progress-ring" width="140" height="140">
                     <defs>
                       <linearGradient id="safeGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" style="stop-color:#15803d;stop-opacity:0.9" />
@@ -639,7 +639,7 @@
           <div class="prediction-group danger">
             <h3>탐지된 위협</h3>
             {% for class_name in predicted_types %}
-            <div class="prediction-item danger">
+            <div class="prediction-item {{ 'safe' if class_name == 'Normal' else 'danger' }}">
               <div class="icon"></div>
               <div class="content">
                 <div class="label">{{ class_name }}</div>
@@ -648,11 +648,12 @@
                   {% elif class_name == 'Botnet' %}봇넷 - 네트워크 제어 악성코드
                   {% elif class_name == 'Download' %}다운로더 - 추가 악성코드 다운로드
                   {% elif class_name == 'Infiltration' %}침투 - 시스템 침입 악성코드
+                  {% elif class_name == 'Normal' %}정상 - 위협이 감지되지 않음
                   {% else %}{{ class_name }} - 악성코드 유형
                   {% endif %}
                 </div>
               </div>
-              <div class="status">탐지됨</div>
+              <div class="status">{{ '정상' if class_name == 'Normal' else '탐지됨' }}</div>
             </div>
             {% endfor %}
             </div>

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "MalOffice Uploader",
+  "name": "KnowMal",
   "version": "0.1.0",
   "permissions": [
     "storage",
@@ -16,7 +16,20 @@
     "https://blog.kakaocdn.net/*",
     "https://mail.google.com/*"
   ],
-  "action": { "default_popup": "popup.html" },
+  "icons": {
+    "16": "images/KnowMal_logo.png",
+    "48": "images/KnowMal_logo.png",
+    "128": "images/KnowMal_logo.png"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "images/KnowMal_logo.png",
+      "48": "images/KnowMal_logo.png",
+      "128": "images/KnowMal_logo.png"
+    }
+  },
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
