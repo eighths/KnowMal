@@ -251,7 +251,7 @@ def view_share(request: Request, share_id: str):
         else:
             print(f"[DEBUG] share.py - analysis_report/report가 없음")
 
-    template_name = "report_unzip.html" if is_archive else "report.html"
+    template_name = "report.html" if is_archive else "report_unzip.html"
     print(f"[DEBUG] share.py - 선택된 템플릿: {template_name} (is_archive={is_archive})")
     print(f"[DEBUG] share.py - data.gemini_explanation 존재: {data.get('gemini_explanation') is not None}")
     if data.get('gemini_explanation'):

@@ -5,60 +5,10 @@
   <title>KnowMal - 문서 악성 코드 탐지 리포트</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
-  <link rel="stylesheet" href="/static/css/report.css?v=11">
+  <link rel="stylesheet" href="/static/css/report.css">
 </head>
 <body>
   {% if data.analysis_report or data.virustotal or data.ai_prediction %}
-  
-  {# === 압축 파일 여부 및 내부 파일 확인 === #}
-  {% set analysis_report = data.analysis_report or data.report %}
-  {% set is_archive = false %}
-  {% set embedded_files = [] %}
-  {% if analysis_report and analysis_report.file %}
-    {% set is_archive = analysis_report.file.is_archive or false %}
-    {% set embedded_files = analysis_report.embedded_files or [] %}
-  {% endif %}
-  
-  {# === Gemini 설명 전역 폴백 === #}
-  {% set gx = None %}
-  
-  {# 압축 파일인 경우, 가장 위험한 내부 파일의 gemini_explanation 찾기 #}
-  {% if is_archive and embedded_files and embedded_files|length > 0 %}
-    {% set most_dangerous_gx = namespace(value=None, threat_count=0) %}
-    {% for item in embedded_files %}
-      {% set rep = item.get('report') %}
-      {% if rep and rep.gemini_explanation %}
-        {% if rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
-          {% set threat_count = 0 %}
-          {% for t in rep.ai_prediction.ai_analysis.predicted_types %}
-            {% if t != 'Normal' %}
-              {% set threat_count = threat_count + 1 %}
-            {% endif %}
-          {% endfor %}
-          {% if threat_count > most_dangerous_gx.threat_count %}
-            {% set most_dangerous_gx.value = rep.gemini_explanation %}
-            {% set most_dangerous_gx.threat_count = threat_count %}
-          {% elif most_dangerous_gx.threat_count == 0 and most_dangerous_gx.value is none %}
-            {# Normal 파일이어도 gemini_explanation이 있으면 사용 #}
-            {% set most_dangerous_gx.value = rep.gemini_explanation %}
-          {% endif %}
-        {% elif most_dangerous_gx.value is none %}
-          {# ai_prediction이 없어도 gemini_explanation이 있으면 사용 #}
-          {% set most_dangerous_gx.value = rep.gemini_explanation %}
-        {% endif %}
-      {% endif %}
-    {% endfor %}
-    {% set gx = most_dangerous_gx.value %}
-  {% else %}
-    {# 일반 파일인 경우 #}
-    {% set gx = (
-        data.gemini_explanation
-        or (data.report.gemini_explanation if data.report else None)
-        or (data.report.report.gemini_explanation if (data.report and data.report.report) else None)
-        or (data.analysis_report.gemini_explanation if data.analysis_report else None)
-        or (data.cache_data.gemini_explanation if data.cache_data else None)
-    ) %}
-  {% endif %}
   
       <!-- 통합 파일 정보 카드 -->
       <div class="unified-file-card">
@@ -78,80 +28,254 @@
           </div>
         </div>
 
+        <!-- 압축 파일 정보 카드 -->      
+        {% set embedded_files = (data.analysis_report.embedded_files if data.analysis_report and data.analysis_report.embedded_files else []) %}
+        {% set is_archive = (data.analysis_report.file.is_archive if data.analysis_report and data.analysis_report.file and data.analysis_report.file.is_archive else False) %}
+        
+        {% if is_archive and embedded_files and embedded_files|length > 0 and data.analysis_report.features.structure %}
+        <div class="file-card" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid #e2e8f0; margin-bottom: 20px;">
+          <div style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+              <div>
+                <h3 style="font-weight: 700; color: #475569; font-size: 18px; margin: 0 0 8px 0;">📦 압축 파일 정보</h3>
+                <span style="font-size: 13px; color: #64748b; background: #e2e8f0; padding: 4px 10px; border-radius: 6px; display: inline-block;">{{ data.analysis_report.features.structure.container_type.upper() }} 포맷</span>
+              </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+              <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+                <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">압축 파일명</div>
+                <div style="color: #334155; font-weight: 600; font-size: 15px; word-break: break-all;">{{ data.filename }}</div>
+              </div>
+              
+              <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+                <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">내부 파일 수</div>
+                <div style="color: #334155; font-weight: 600; font-size: 15px;">{{ embedded_files|length }}개</div>
+              </div>
+              
+              {% if data.analysis_report.features.structure.malicious_files_count %}
+              <div style="background: #ffffff; border: 1px solid #fca5a5; border-radius: 8px; padding: 16px;">
+                <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">악성 파일 수</div>
+                <div style="color: #dc2626; font-weight: 700; font-size: 15px;">{{ data.analysis_report.features.structure.malicious_files_count }}개</div>
+              </div>
+              {% endif %}
+              
+              {% if data.analysis_report.risk_assessment.overall_risk_score %}
+              <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+                <div style="color: #64748b; font-size: 13px; margin-bottom: 6px;">전체 위험도</div>
+                {% set risk_score = data.analysis_report.risk_assessment.overall_risk_score %}
+                {% if risk_score > 0.5 %}
+                  {% set risk_color_class = 'text-danger' %}
+                {% elif risk_score > 0.1 %}
+                  {% set risk_color_class = 'text-warning' %}
+                {% else %}
+                  {% set risk_color_class = 'text-safe' %}
+                {% endif %}
+                <div class="risk-percentage {{ risk_color_class }}">{{ "%.1f"|format(risk_score * 100) }}%</div>
+              </div>
+              {% endif %}
+            </div>
+            
+            <!-- 악성 파일 목록 표시 -->
+            {% if data.analysis_report.features.structure.malicious_files_count and data.analysis_report.features.structure.malicious_files_count > 0 %}
+            <div style="margin-top: 20px; padding: 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
+              <div style="color: #dc2626; font-weight: 600; font-size: 14px; margin-bottom: 12px;">⚠️ 발견된 악성 파일</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <span style="background: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">{{ data.filename }}</span>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
         <!-- 파일 정보 카드 -->
         <div class="file-card">
-      {% set vt_display = data.virustotal if data.virustotal else (data.analysis_report.virustotal if data.analysis_report and data.analysis_report.virustotal else None) %}
-      
-      {# AI 탭 데이터 먼저 준비 (AI 탭과 동일한 로직) #}
-      {% set ai_data_for_card = data %}
-      
-      {% if is_archive and embedded_files and embedded_files|length > 0 %}
-        {% set most_dangerous_card = namespace(item=None, threat_count=0, has_malicious=false) %}
-        
-        {% for item in embedded_files %}
-          {% set rep = item.get('report') %}
-          {% if rep and rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
-            {% set threat_count = 0 %}
-            {% for t in rep.ai_prediction.ai_analysis.predicted_types %}
-              {% if t != 'Normal' %}
-                {% set threat_count = threat_count + 1 %}
-              {% endif %}
-            {% endfor %}
-            {% if threat_count > 0 %}
-              {% set most_dangerous_card.has_malicious = true %}
-              {% if threat_count > most_dangerous_card.threat_count %}
-                {% set most_dangerous_card.item = item %}
-                {% set most_dangerous_card.threat_count = threat_count %}
-              {% endif %}
-            {% endif %}
-          {% endif %}
-        {% endfor %}
-        
-        {% if most_dangerous_card.item %}
-          {% set rep = most_dangerous_card.item.report %}
-          {% set ai_data_for_card = {"ai_prediction": rep.ai_prediction, "filename": most_dangerous_card.item.filename} %}
-        {% elif most_dangerous_card.has_malicious == false %}
-          {% if embedded_files and embedded_files|length > 0 %}
-            {% set first_file = embedded_files[0] %}
-            {% if first_file.report and first_file.report.ai_prediction %}
-              {% set ai_data_for_card = {"ai_prediction": first_file.report.ai_prediction, "filename": first_file.filename} %}
-            {% endif %}
-          {% endif %}
-        {% endif %}
+      {% set embedded_files = (data.analysis_report.embedded_files if data.analysis_report and data.analysis_report.embedded_files else []) %}
+      {% set is_archive = (data.analysis_report.file.is_archive if data.analysis_report and data.analysis_report.file and data.analysis_report.file.is_archive else False) %}
+      {% set virustotal = data.virustotal %}
+      {% if not virustotal and data.analysis_report and data.analysis_report.virustotal %}
+        {% set virustotal = data.analysis_report.virustotal %}
       {% endif %}
       
-      {# AI 탭 데이터에서 위협 추출 #}
       {% set ai_has_threat = false %}
       {% set ai_threats = [] %}
       {% set ai_is_normal = false %}
-      
-      {% if ai_data_for_card.ai_prediction and ai_data_for_card.ai_prediction.ai_analysis and ai_data_for_card.ai_prediction.ai_analysis.predicted_types %}
-        {% set predicted_types = ai_data_for_card.ai_prediction.ai_analysis.predicted_types %}
-        {% for threat in predicted_types %}
-          {% if threat != 'Normal' %}
-            {% set _ = ai_threats.append(threat) %}
-          {% else %}
-            {% set ai_is_normal = true %}
+      {% if data.ai_prediction and data.ai_prediction.ai_analysis %}
+        {% set predicted_types = data.ai_prediction.ai_analysis.predicted_types %}
+        {% if predicted_types %}
+          {% set dangerous_types = [] %}
+          {% for threat in predicted_types %}
+            {% if threat != 'Normal' %}
+              {% set _ = dangerous_types.append(threat) %}
+            {% else %}
+              {% set ai_is_normal = true %}
+            {% endif %}
+          {% endfor %}
+          {% if dangerous_types %}
+            {% set ai_has_threat = true %}
+            {% set ai_threats = dangerous_types %}
           {% endif %}
-        {% endfor %}
-        {% if ai_threats %}
-          {% set ai_has_threat = true %}
         {% endif %}
       {% endif %}
       
       {% set vt_detection_rate = 0 %}
       {% set vt_malicious_count = 0 %}
       {% set vt_total_scans = 0 %}
-      {% if vt_display and vt_display.available and vt_display.scan_summary %}
-        {% set scan_summary = vt_display.scan_summary %}
+      {% if virustotal and virustotal.available %}
+        {% set scan_summary = virustotal.scan_summary %}
         {% set vt_detection_rate = (scan_summary.detection_rate or 0)|float %}
         {% set vt_malicious_count = scan_summary.malicious or 0 %}
         {% set vt_total_scans = scan_summary.total or 0 %}
       {% endif %}
 
-      {% if ai_has_threat or vt_malicious_count > 0 %}
-          <!-- 악성 파일 레이아웃 -->
+      {% set original_archive_filename = data.filename %}
+      {% set display_filename = data.filename %}
+      {% set display_size = data.size_bytes %}
+      {% set display_sha = data.sha256 %}
+      {% set display_mime = data.mime_type %}
+      {% if is_archive and embedded_files and embedded_files|length > 0 %}
+        {% set selected = None %}
+        {% set best_rate = -1 %}
+        {% for item in embedded_files %}
+          {% set rep = item.report %}
+          {% if rep and rep.virustotal and rep.virustotal.scan_summary %}
+            {% set _sum = rep.virustotal.scan_summary %}
+            {% set _total = (_sum.total or 0) %}
+            {% set _mal = (_sum.malicious or 0) %}
+            {% set _rate = (_mal / _total) if _total > 0 else 0 %}
+            {% if _rate > best_rate %}
+              {% set selected = item %}
+              {% set best_rate = _rate %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% if not selected %}
+          {% set best_ai = -1 %}
+          {% for item in embedded_files %}
+            {% set rep = item.report %}
+            {% set cnt = 0 %}
+            {% if rep and rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
+              {% for t in rep.ai_prediction.ai_analysis.predicted_types %}
+                {% if t != 'Normal' %}{% set cnt = cnt + 1 %}{% endif %}
+              {% endfor %}
+            {% endif %}
+            {% if cnt > best_ai %}
+              {% set selected = item %}
+              {% set best_ai = cnt %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {% if not selected %}
+          {% set selected = embedded_files[0] %}
+        {% endif %}
+        {% set rep = selected.report %}
+        {% if rep and rep.file %}
+          {% set display_filename = selected.filename or rep.file.filename or data.filename %}
+          {% set display_size = selected.size_bytes or rep.file.size_bytes or data.size_bytes %}
+          {% set display_sha = (rep.file.hash.sha256 if rep.file.hash else data.sha256) %}
+          {% set display_mime = rep.file.mime_type or data.mime_type %}
+        {% else %}
+          {% set display_filename = selected.filename or data.filename %}
+          {% set display_size = selected.size_bytes or data.size_bytes %}
+        {% endif %}
+      {% endif %}
+      
+      {% if is_archive and embedded_files and embedded_files|length > 0 %}
+        {% set agg = namespace(max_rate=0.0, child_vt=None, ai_types=[]) %}
+        {% for item in embedded_files %}
+          {% set rep = item.report %}
+          {% if rep and rep.virustotal and rep.virustotal.scan_summary %}
+            {% set _sum = rep.virustotal.scan_summary %}
+            {% set _total = (_sum.total or 0) %}
+            {% set _mal = (_sum.malicious or 0) %}
+            {% set _rate = (_mal / _total * 100) if _total > 0 else 0 %}
+            {% if _rate > agg.max_rate %}
+              {% set agg.max_rate = _rate %}
+              {% set agg.child_vt = rep.virustotal %}
+            {% endif %}
+          {% endif %}
+          {% if rep and rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
+            {% for t in rep.ai_prediction.ai_analysis.predicted_types %}
+              {% if t != 'Normal' and t not in agg.ai_types %}
+                {% set _ = agg.ai_types.append(t) %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+
+        {% if agg.child_vt %}
+          {% set virustotal = agg.child_vt %}
+          {% set scan_summary = virustotal.scan_summary %}
+          {% set vt_detection_rate = (scan_summary.detection_rate or ((scan_summary.malicious or 0) / (scan_summary.total or 1) * 100))|float %}
+          {% set vt_malicious_count = scan_summary.malicious or 0 %}
+          {% set vt_total_scans = scan_summary.total or 0 %}
+        {% endif %}
+
+        {% if agg.ai_types and agg.ai_types|length > 0 %}
+          {% set ai_has_threat = true %}
+          {% set ai_threats = agg.ai_types %}
+        {% elif not ai_has_threat %}
+          {% set ai_threats = [] %}
+        {% endif %}
+
+        {% if not ai_has_threat and vt_malicious_count > 0 %}
+          {% set ai_has_threat = true %}
+        {% endif %}
+      {% endif %}
+
+      {% if ai_has_threat %}
           <div class="malicious-file-layout">
+            {% if false %}
+            {% set embedded_vt_dangerous = 0 %}
+            {% set embedded_ai_dangerous = 0 %}
+            {% for item in embedded_files %}
+              {% set rep = item.report %}
+              {% if rep and rep.virustotal and rep.virustotal.scan_summary and rep.virustotal.scan_summary.malicious > 0 %}
+                {% set embedded_vt_dangerous = embedded_vt_dangerous + 1 %}
+              {% endif %}
+              {% if rep and rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
+                {% set has_dangerous_ai = false %}
+                {% for threat in rep.ai_prediction.ai_analysis.predicted_types %}
+                  {% if threat != 'Normal' and not has_dangerous_ai %}
+                    {% set embedded_ai_dangerous = embedded_ai_dangerous + 1 %}
+                    {% set has_dangerous_ai = true %}
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+            {% endfor %}
+            
+            {% if embedded_vt_dangerous > 0 or embedded_ai_dangerous > 0 %}
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 0 0 24px 0; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <div style="font-size: 24px;">📦</div>
+                <div>
+                  <div style="font-weight: 700; font-size: 18px; color: #92400e; margin-bottom: 4px;">
+                    ZIP 압축 파일은 정상이고 내부 파일 검사했더니 다음과 같은 결과가 보입니다
+                  </div>
+                  <div style="font-size: 14px; color: #a16207;">
+                    압축 파일 자체는 안전하지만, 내부에 포함된 {{ embedded_files|length }}개 파일 중 위험한 파일이 발견되었습니다.
+                  </div>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px;">
+                {% if embedded_vt_dangerous > 0 %}
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #fca5a5; border-radius: 8px; padding: 12px;">
+                  <div style="font-weight: 600; color: #dc2626; font-size: 14px;">VirusTotal 탐지</div>
+                  <div style="font-size: 16px; font-weight: 700; color: #dc2626;">{{ embedded_vt_dangerous }}개 파일</div>
+                </div>
+                {% endif %}
+                {% if embedded_ai_dangerous > 0 %}
+                <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid #fbbf24; border-radius: 8px; padding: 12px;">
+                  <div style="font-weight: 600; color: #f59e0b; font-size: 14px;">AI 위험 예측</div>
+                  <div style="font-size: 16px; font-weight: 700; color: #f59e0b;">{{ embedded_ai_dangerous }}개 파일</div>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+            {% endif %}
+            
             <!-- 상단: 원형 그래프 + 파일 정보 -->
             <div class="file-analysis-header">
               <!-- 왼쪽: 원형 그래프 (VirusTotal 결과) -->
@@ -188,19 +312,19 @@
               <div class="file-info-section">
                 <div class="file-info-item">
                   <div class="info-label">파일명</div>
-                  <div class="info-value">{{ data.filename }}</div>
+                  <div class="info-value">{{ display_filename }}</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">크기</div>
-                  <div class="info-value">{{ (data.size_bytes / 1024 / 1024)|round(1) }} MB</div>
+                  <div class="info-value">{{ (display_size / 1024 / 1024)|round(1) }} MB</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">SHA-256</div>
-                  <div class="info-value">{{ (data.sha256[:8] + '...' + data.sha256[-4:]) if data.sha256 else 'unknown' }}</div>
+                  <div class="info-value">{{ (display_sha[:8] + '...' + display_sha[-4:]) if display_sha else 'unknown' }}</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">문서 유형</div>
-                  {% set mime_type = data.mime_type or "알 수 없음" %}
+                  {% set mime_type = display_mime or "알 수 없음" %}
                   {% set friendly_type = "알 수 없음" %}
                   {% if mime_type.startswith('application/msword') or mime_type.startswith('application/vnd.openxmlformats-officedocument.wordprocessingml') %}
                     {% set friendly_type = "Word 문서" %}
@@ -234,8 +358,6 @@
             <div class="section-divider"></div>
             
             <!-- 하단: 액션 버튼 -->
-            <!-- DEBUG: ai_has_threat={{ ai_has_threat }}, ai_threats={{ ai_threats }}, len={{ ai_threats|length }} -->
-            {% if ai_threats and ai_threats|length > 0 %}
             <div class="file-actions-and-tags">
               <div class="action-buttons">
                 {% for threat in ai_threats %}
@@ -243,10 +365,8 @@
                 {% endfor %}
               </div>
             </div>
-            {% endif %}
             
             <!-- 위험 태그들 -->
-            {% if ai_threats and ai_threats|length > 0 %}
             {% set all_tags = [] %}
             {% for threat in ai_threats %}
               {% if threat == 'Download' %}
@@ -280,11 +400,61 @@
                 </div>
               {% endfor %}
             </div>
-            {% endif %}
           </div>
       {% else %}
-          <!-- 정상 파일 레이아웃 -->
+          <!-- 정상 파일 레이아웃  -->
           <div class="normal-file-layout">
+            <!-- 아카이브 파일 안내 (내부 파일 위험도 표시) -->
+            {% if is_archive and embedded_files and embedded_files|length > 0 %}
+            {% set embedded_vt_dangerous = 0 %}
+            {% set embedded_ai_dangerous = 0 %}
+            {% for item in embedded_files %}
+              {% set rep = item.report %}
+              {% if rep and rep.virustotal and rep.virustotal.scan_summary and rep.virustotal.scan_summary.malicious > 0 %}
+                {% set embedded_vt_dangerous = embedded_vt_dangerous + 1 %}
+              {% endif %}
+              {% if rep and rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
+                {% set has_dangerous_ai = false %}
+                {% for threat in rep.ai_prediction.ai_analysis.predicted_types %}
+                  {% if threat != 'Normal' and not has_dangerous_ai %}
+                    {% set embedded_ai_dangerous = embedded_ai_dangerous + 1 %}
+                    {% set has_dangerous_ai = true %}
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+            {% endfor %}
+            
+            {% if embedded_vt_dangerous > 0 or embedded_ai_dangerous > 0 %}
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 0 0 24px 0; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <div style="font-size: 24px;">📦</div>
+                <div>
+                  <div style="font-weight: 700; font-size: 18px; color: #92400e; margin-bottom: 4px;">
+                    ZIP 압축 파일은 정상이고 내부 파일 검사했더니 다음과 같은 결과가 보입니다
+                  </div>
+                  <div style="font-size: 14px; color: #a16207;">
+                    압축 파일 자체는 안전하지만, 내부에 포함된 {{ embedded_files|length }}개 파일 중 위험한 파일이 발견되었습니다.
+                  </div>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px;">
+                {% if embedded_vt_dangerous > 0 %}
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #fca5a5; border-radius: 8px; padding: 12px;">
+                  <div style="font-weight: 600; color: #dc2626; font-size: 14px;">VirusTotal 탐지</div>
+                  <div style="font-size: 16px; font-weight: 700; color: #dc2626;">{{ embedded_vt_dangerous }}개 파일</div>
+                </div>
+                {% endif %}
+                {% if embedded_ai_dangerous > 0 %}
+                <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid #fbbf24; border-radius: 8px; padding: 12px;">
+                  <div style="font-weight: 600; color: #f59e0b; font-size: 14px;">AI 위험 예측</div>
+                  <div style="font-size: 16px; font-weight: 700; color: #f59e0b;">{{ embedded_ai_dangerous }}개 파일</div>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+            {% endif %}
+            
             <!-- 상단: 원형 그래프 + 파일 정보 -->
             <div class="file-analysis-header">
               <!-- 왼쪽: 원형 그래프 (VirusTotal 결과) -->
@@ -299,15 +469,12 @@
                         <stop offset="100%" style="stop-color:#15803d;stop-opacity:0.9" />
                       </linearGradient>
                     </defs>
-                    <!-- 배경 트랙 (Normal 상태에서는 투명하게 처리하여 그라데이션만 보이도록) -->
                     <circle class="progress-ring-track" cx="90" cy="90" r="75" stroke="transparent" stroke-width="18" fill="transparent"/>
-                    <!-- 진행 상태 호 (Normal 상태일 때 항상 100% 채워진 초록색 그라데이션) -->
                     <circle class="progress-ring-fill" cx="90" cy="90" r="75" fill="transparent" stroke-width="18" stroke-linecap="round"
                             stroke="url(#safeGradient2)" 
                             stroke-dasharray="471 471" 
                             stroke-dashoffset="0"
-                            transform="rotate(-90 90 90)"
-                            style="stroke-dasharray: 471.239, 471.239; stroke-dashoffset: 0; transition: none;"/>
+                            transform="rotate(-90 90 90)"/>
                   </svg>
                   <div class="progress-text">
                     <div class="progress-status normal-status">Normal</div>
@@ -324,19 +491,19 @@
               <div class="file-info-section">
                 <div class="file-info-item">
                   <div class="info-label">파일명</div>
-                  <div class="info-value">{{ data.filename }}</div>
+                  <div class="info-value">{{ display_filename }}</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">크기</div>
-                  <div class="info-value">{{ (data.size_bytes / 1024 / 1024)|round(1) }} MB</div>
+                  <div class="info-value">{{ (display_size / 1024 / 1024)|round(1) }} MB</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">SHA-256</div>
-                  <div class="info-value">{{ (data.sha256[:8] + '...' + data.sha256[-4:]) if data.sha256 else 'unknown' }}</div>
+                  <div class="info-value">{{ (display_sha[:8] + '...' + display_sha[-4:]) if display_sha else 'unknown' }}</div>
                 </div>
                 <div class="file-info-item">
                   <div class="info-label">문서 유형</div>
-                  {% set mime_type = data.mime_type or "알 수 없음" %}
+                  {% set mime_type = display_mime or "알 수 없음" %}
                   {% set friendly_type = "알 수 없음" %}
                   {% if mime_type.startswith('application/msword') or mime_type.startswith('application/vnd.openxmlformats-officedocument.wordprocessingml') %}
                     {% set friendly_type = "Word 문서" %}
@@ -392,45 +559,20 @@
       {% endif %}
         </div>
         </div>
-        
-        <!-- Gemini 종합 설명 -->
-        {# ==== Gemini 종합 설명 (요약/대처) ==== #}
-        {% if gx %}
-          {% if gx is mapping %}
-            <div class="gemini-summary-section">
-              <div class="summary-header">
-                <span class="summary-title">AI 보안 분석 종합 설명</span>
-              </div>
-
-              <div class="summary-content">
-                {{ gx.summary }}
-              </div>
-
-              <div class="action-content">
-                <ul>
-                  {% if gx.actions and gx.actions.immediate %}<li>즉시 조치: {{ gx.actions.immediate }}</li>{% endif %}
-                  {% if gx.actions and gx.actions.investigate %}<li>조사: {{ gx.actions.investigate }}</li>{% endif %}
-                  {% if gx.actions and gx.actions.deep %}<li>심층 대응: {{ gx.actions.deep }}</li>{% endif %}
-                </ul>
-              </div>
-            </div>
-          {% else %}
-            <div class="gemini-summary-section">
-              <div class="summary-header">
-                <span class="summary-title">AI 보안 분석 종합 설명</span>
-              </div>
-              <div class="summary-content">{{ gx }}</div>
-            </div>
-          {% endif %}
-        {% endif %}
-        {# ==== /Gemini 종합 설명 ==== #}
-
       </div>
 
       <!-- 탭 네비게이션 -->
+
       {% set prefer_vt = false %}
-      {% if vt_display and vt_display.available and vt_display.scan_summary %}
+      {% if virustotal and virustotal.available and virustotal.scan_summary %}
         {% set prefer_vt = true %}
+      {% elif is_archive and embedded_files and embedded_files|length > 0 %}
+        {% for item in embedded_files %}
+          {% set rep = item.report %}
+          {% if rep and rep.virustotal and rep.virustotal.available and rep.virustotal.scan_summary %}
+            {% set prefer_vt = true %}
+          {% endif %}
+        {% endfor %}
       {% endif %}
       <div class="tab-navigation">
         <button class="tab-button {{ 'active' if not prefer_vt else '' }}" data-tab="ai-analysis">
@@ -451,7 +593,7 @@
                 {% set most_dangerous = namespace(item=None, threat_count=0, has_malicious=false) %}
                 
                 {% for item in embedded_files %}
-                  {% set rep = item.get('report') %}
+                  {% set rep = item.report %}
                   {% if rep and rep.ai_prediction and rep.ai_prediction.ai_analysis and rep.ai_prediction.ai_analysis.predicted_types %}
                     {% set threat_count = 0 %}
                     {% for t in rep.ai_prediction.ai_analysis.predicted_types %}
@@ -472,35 +614,24 @@
                 {% if most_dangerous.item %}
                   {% set rep = most_dangerous.item.report %}
                   {% set ai_data = {"ai_prediction": rep.ai_prediction, "filename": most_dangerous.item.filename} %}
-                  {# Gemini 설명 가져오기 #}
-                  {% set gx = rep.gemini_explanation or None %}
                 {% elif most_dangerous.has_malicious == false %}
                   {# 모든 내부 파일이 Normal인 경우, 첫 번째 파일 사용 #}
                   {% if embedded_files and embedded_files|length > 0 %}
                     {% set first_file = embedded_files[0] %}
                     {% if first_file.report and first_file.report.ai_prediction %}
                       {% set ai_data = {"ai_prediction": first_file.report.ai_prediction, "filename": first_file.filename} %}
-                      {% set gx = first_file.report.gemini_explanation or None %}
                     {% endif %}
                   {% endif %}
                 {% endif %}
                 
               {% else %}
                 {# 일반 파일의 경우 원본 data 사용 #}
-                {% set gx = (
-                    data.gemini_explanation
-                    or (data.report.gemini_explanation if data.report else None)
-                    or (data.analysis_report.gemini_explanation if data.analysis_report else None)
-                ) %}
               {% endif %}
               
               {% if ai_data.ai_prediction and ai_data.ai_prediction.ai_analysis %}
               {% set ai_analysis = ai_data.ai_prediction.ai_analysis %}
               {% set predicted_types = ai_analysis.predicted_types %}
-              {# 클래스 확률: confidence_scores → class_probabilities → {} #}
-              {% set confidence_scores = ai_analysis.confidence_scores
-                                        or ai_analysis.class_probabilities
-                                        or {} %}
+              {% set confidence_scores = ai_analysis.confidence_scores %}
               {% set model_classes = ai_analysis.model_classes %}
     
           <!-- 위험 항목 그룹 -->
@@ -527,7 +658,120 @@
             </div>
           {% endif %}
           
+          <!-- 안전 항목 그룹 -->
+          {% set safe_types = ['Infiltration', 'Normal'] %}
+          {% set detected_safe = [] %}
+          {% for class_name in safe_types %}
+            {% if class_name not in predicted_types %}
+              {% set _ = detected_safe.append(class_name) %}
+            {% endif %}
+          {% endfor %}
+          
+          {% if detected_safe %}
+          <div class="prediction-group safe collapsed">
+            <h3>✅ 정상 항목 ({{ detected_safe|length }}개)</h3>
+            <button class="toggle-btn" onclick="toggleSafeItems()">펼쳐보기 ▼</button>
+            <div class="prediction-list hidden" id="safe-items">
+              {% for class_name in detected_safe %}
+              <div class="prediction-item safe">
+                <div class="icon">✅</div>
+                <div class="content">
+                  <div class="label">{{ class_name }}</div>
+                  <div class="desc">정상 상태</div>
+        </div>
+                <div class="status">정상</div>
+      </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          
           <div class="divider"></div>
+      
+      
+      {% if ai_analysis.network_feature_probabilities %}
+      <div class="ai-network-section">
+        <h3>📊 네트워크 활동 분석</h3>
+        <div class="network-stats">
+          {% set feature_names = {
+            'external_session_count': '외부 연결 시도',
+            'http_any_external_file_download': '파일 다운로드',
+            'http_any_request': 'HTTP 요청',
+            'dns_any_request': 'DNS 조회',
+            'http_hosts_count': '호스트 연결',
+            'dns_domains_count': '도메인 조회',
+            'http_user_agents_count': '사용자 에이전트',
+            'http_redirect_chain_count': '리다이렉트 체인',
+            'http_download_mime_types_count': '다운로드 타입',
+            'http_methods_count': 'HTTP 메서드',
+            'protocols_count': '프로토콜 사용'
+          } %}
+          
+          {% set feature_icons = {
+            'external_session_count': '🌐',
+            'http_any_external_file_download': '📥',
+            'http_any_request': '🔗',
+            'dns_any_request': '🔍',
+            'http_hosts_count': '🏠',
+            'dns_domains_count': '🌍',
+            'http_user_agents_count': '👤',
+            'http_redirect_chain_count': '🔄',
+            'http_download_mime_types_count': '📄',
+            'http_methods_count': '⚡',
+            'protocols_count': '🔧'
+          } %}
+          
+          {% set sorted_features = [] %}
+          {% for feature, probability in ai_analysis.network_feature_probabilities.items() %}
+          {% if probability > 0.1 %}  
+              {% set _ = sorted_features.append((feature, probability)) %}
+            {% endif %}
+          {% endfor %}
+          {% set sorted_features = sorted_features|sort(attribute=1, reverse=true) %}
+          
+          {% for feature, probability in sorted_features[:5] %}
+          {% set prob_percent = (probability * 100)|round(1) if probability <= 1 else probability|round(1) %}
+          {% if prob_percent > 100 %}
+            {% set prob_percent = 100 %}
+          {% endif %}
+          {% set risk_level = 'high' if prob_percent > 60 else 'medium' if prob_percent > 30 else 'low' %}
+          <div class="stat-item {{ risk_level }}">
+            <div class="stat-header">
+              <span class="stat-icon">{{ feature_icons.get(feature, '📊') }}</span>
+              <span class="stat-name">{{ feature_names.get(feature, feature) }}</span>
+              <span class="stat-value">{{ prob_percent }}%</span>
+            </div>
+            <div class="stat-bar">
+              <div class="stat-fill {{ risk_level }}" data-width="{{ prob_percent }}"></div>
+            </div>
+            <div class="stat-desc">{{ feature }}</div>
+          </div>
+          {% endfor %}
+          
+          {% if sorted_features|length > 5 %}
+          <button class="show-all-btn" onclick="toggleAllStats()">전체 통계 보기 ({{ sorted_features|length }}개) ▼</button>
+          <div class="additional-stats hidden" id="additional-stats">
+            {% for feature, probability in sorted_features[5:] %}
+            {% set prob_percent = (probability * 100)|round(1) if probability <= 1 else probability|round(1) %}
+            {% if prob_percent > 100 %}
+              {% set prob_percent = 100 %}
+            {% endif %}
+            {% set risk_level = 'high' if prob_percent > 60 else 'medium' if prob_percent > 30 else 'low' %}
+            <div class="stat-item {{ risk_level }}">
+              <div class="stat-header">
+                <span class="stat-icon">{{ feature_icons.get(feature, '📊') }}</span>
+                <span class="stat-name">{{ feature_names.get(feature, feature) }}</span>
+                <span class="stat-value">{{ prob_percent }}%</span>
+              </div>
+              <div class="stat-bar">
+                <div class="stat-fill {{ risk_level }}" data-width="{{ prob_percent }}"></div>
+              </div>
+              <div class="stat-desc">{{ feature }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+      {% endif %}
       
       <div class="ai-footer">
         <div class="ai-disclaimer">
@@ -535,168 +779,73 @@
           실제 악성코드 여부는 전문 보안 도구를 통해 확인하시기 바랍니다.
               </div>
             </div>
-            
-            <!-- Gemini XAI 설명 -->
-            {# ==== Gemini XAI 설명 (근거) ==== #}
-            {# Normal이 아닐 때만 표시 #}
-            {% set hard_labels = ai_data.ai_prediction.ai_analysis.predicted_types if (ai_data.ai_prediction and ai_data.ai_prediction.ai_analysis) else [] %}
-            {% set is_only_normal = hard_labels|length == 1 and hard_labels[0] == 'Normal' %}
-            {% if gx and not is_only_normal %}
-              {% if gx is mapping and gx.xai %}
-                <div class="gemini-xai-section">
-                  <div class="xai-header">
-                    <span class="xai-title">AI 분석 근거 (XAI)</span>
-                  </div>
-
-                  <div class="xai-content">
-                    {% if gx.xai.bullets %}
-                      <ul>
-                        {% for b in gx.xai.bullets %}
-                          <li>{{ b }}</li>
-                        {% endfor %}
-                      </ul>
-                    {% endif %}
-                  </div>
-                </div>
               {% else %}
-                <div class="gemini-xai-section">
-                  <div class="xai-header">
-                    <span class="xai-title">AI 분석 근거 (XAI)</span>
-                  </div>
-                  <div class="xai-content">{{ gx }}</div>
-                </div>
-              {% endif %}
-            {% endif %}
-            {# ==== /Gemini XAI 설명 ==== #}
-
-            <!-- SHAP 기반 특징 중요도 표시 -->
-            {# ==== SHAP 기반 특징 중요도 (XAI) ==== #}
-            {# Normal이 아닐 때만 표시 #}
-            {% if ai_data.ai_prediction and ai_data.ai_prediction.ai_analysis and not is_only_normal %}
-              {% set feature_importance = ((ai_data.ai_prediction.ai_analysis.model_info or {}).get('enhanced_features', {}) or {}).get('feature_importance') if ai_data.ai_prediction.ai_analysis.get('model_info') else None %}
-              <!-- DEBUG: feature_importance exists = {{ feature_importance is not none }}, count = {{ feature_importance|length if feature_importance else 0 }} -->
-              {% if feature_importance %}
-              <div class="feature-importance-section">
-                <div class="feature-header">
-                  <span class="feature-title">SHAP 기반 특징 중요도 (XAI)</span>
-                  <span class="feature-subtitle">SHAP(SHapley Additive exPlanations)을 통해 각 악성코드 클래스 판단에 기여한 주요 특징들과 그 영향도를 분석한 결과입니다.</span>
-                </div>
-
-                <div class="feature-content">
-                  {# 클래스별로 그룹화 #}
-                  {% set class_groups = {} %}
-                  {% for feature_name, importance in feature_importance.items() %}
-                    {% if feature_name.startswith('Backdoor_') %}
-                      {% set class_name = 'Backdoor' %}
-                    {% elif feature_name.startswith('Botnet_') %}
-                      {% set class_name = 'Botnet' %}
-                    {% elif feature_name.startswith('Download_') %}
-                      {% set class_name = 'Download' %}
-                    {% elif feature_name.startswith('Infiltration_') %}
-                      {% set class_name = 'Infiltration' %}
-                    {% elif feature_name.startswith('Normal_') %}
-                      {% set class_name = 'Normal' %}
-                    {% elif feature_name.startswith('soft_') %}
-                      {% set class_name = 'Soft_' + feature_name.split('_')[1] %}
-                    {% else %}
-                      {% set class_name = 'Other' %}
-                    {% endif %}
-                    
-                    {% if class_name not in class_groups %}
-                      {% set _ = class_groups.update({class_name: []}) %}
-                    {% endif %}
-                    {% set _ = class_groups[class_name].append((feature_name, importance)) %}
-                  {% endfor %}
-                  
-                  {# 각 클래스별로 박스 표시 #}
-                  <div class="class-boxes-container">
-                    {% for class_name, features in class_groups.items() %}
-                      {% set sorted_features = features|sort(attribute=1, reverse=true) %}
-                      <div class="class-box">
-                        <div class="class-box-header">
-                          {% if class_name == 'Backdoor' %}
-                            <span class="class-icon backdoor">🔴</span>
-                            <span class="class-name">Backdoor</span>
-                          {% elif class_name == 'Botnet' %}
-                            <span class="class-icon botnet">🟡</span>
-                            <span class="class-name">Botnet</span>
-                          {% elif class_name == 'Download' %}
-                            <span class="class-icon download">🔵</span>
-                            <span class="class-name">Download</span>
-                          {% elif class_name == 'Infiltration' %}
-                            <span class="class-icon infiltration">🟠</span>
-                            <span class="class-name">Infiltration</span>
-                          {% elif class_name == 'Normal' %}
-                            <span class="class-icon normal">🟢</span>
-                            <span class="class-name">Normal</span>
-                          {% elif class_name.startswith('Soft_') %}
-                            <span class="class-icon soft">⭐</span>
-                            <span class="class-name">{{ class_name.replace('Soft_', 'Soft ') }}</span>
-                          {% else %}
-                            <span class="class-icon">🔍</span>
-                            <span class="class-name">{{ class_name }}</span>
-                          {% endif %}
-                        </div>
-                        
-                        <div class="class-box-features">
-                            {% for feature_name, importance in sorted_features %}
-                              <div class="simple-feature-row">
-                                <span class="simple-feature-name">
-                                  {% if feature_name.startswith('Backdoor_') %}
-                                    {{ feature_name.replace('Backdoor_', '').replace('_', ' ') }}
-                                  {% elif feature_name.startswith('Botnet_') %}
-                                    {{ feature_name.replace('Botnet_', '').replace('_', ' ') }}
-                                  {% elif feature_name.startswith('Download_') %}
-                                    {{ feature_name.replace('Download_', '').replace('_', ' ') }}
-                                  {% elif feature_name.startswith('Infiltration_') %}
-                                    {{ feature_name.replace('Infiltration_', '').replace('_', ' ') }}
-                                  {% elif feature_name.startswith('Normal_') %}
-                                    {{ feature_name.replace('Normal_', '').replace('_', ' ') }}
-                                  {% elif feature_name.startswith('soft_') %}
-                                    {% set parts = feature_name.replace('soft_', '').split('_', 1) %}
-                                    {{ (parts[1] if parts|length > 1 else feature_name).replace('_', ' ') }}
-                                  {% else %}
-                                    {{ feature_name.replace('_', ' ') }}
-                                  {% endif %}
-                                </span>
-                                <div class="simple-bar-container">
-                                  <div class="simple-bar-fill" style="width: {{ (importance * 100)|round(1) }}%">
-                                    <span class="simple-percentage-in-bar">{{ (importance * 100)|round(1) }}%</span>
-                                  </div>
-                                </div>
-                              </div>
-                            {% endfor %}
-                        </div>
-                      </div>
-                    {% endfor %}
-                  </div>
-
+              <div class="no-data-message">
+                <div class="no-data-icon">🤖</div>
+                <div class="no-data-text">
+                  {% if is_archive and embedded_files and embedded_files|length > 0 %}
+                    압축 파일 내부 파일들의 AI 분석 결과가 없습니다.
+                  {% else %}
+                    AI 분석 결과가 없습니다.
+                  {% endif %}
                 </div>
               </div>
               {% endif %}
-            {% endif %}
-
           </div>
         </div>
       </div>
-
-      {% else %}
-      <div class="no-data-message">
-        <div class="no-data-icon">🤖</div>
-        <div class="no-data-text">
-          {% if is_archive and embedded_files and embedded_files|length > 0 %}
-            압축 파일 내부 파일들의 AI 분석 결과가 없습니다.
-          {% else %}
-            AI 분석 결과가 없습니다.
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
 
       <!-- VirusTotal 바이러스 검사 결과 탭 콘텐츠 -->
       <div id="virustotal-tab" class="tab-content {{ 'active' if prefer_vt else '' }}">
         <div class="analysis-section vt-section">
           <div class="section-content">
+            {#
+              아카이브일 때는 내부 파일의 VT 결과를 직접 보여준다.
+              - 가장 높은 탐지율을 가진 내부 파일을 선택하며, 파일명도 함께 추적한다.
+              - 아카이브가 아니면 서버가 전달한 virustotal 사용.
+            #}
+            {# 상단에서 계산된 virustotal(내부 파일 집계)을 우선 사용 #}
+            {% set vt_display = virustotal %}
+            {% set vt_filename = display_filename if display_filename else data.filename %}
+            {% if is_archive and embedded_files and embedded_files|length > 0 %}
+              {% if not vt_display or not vt_display.scan_summary %}
+                {% set most_dangerous_vt = namespace(item=None, rate=0, has_vt_data=false) %}
+                {% for item in embedded_files %}
+                  {% set rep = item.report %}
+                  {% if rep and rep.virustotal and rep.virustotal.available and rep.virustotal.scan_summary %}
+                    {% set most_dangerous_vt.has_vt_data = true %}
+                    {% set vt_summary = rep.virustotal.scan_summary %}
+                    {% set vt_malicious = (vt_summary.malicious or 0) %}
+                    {% set vt_total = (vt_summary.total or 0) %}
+                    {% set vt_rate = (vt_malicious / vt_total * 100) if vt_total > 0 else 0 %}
+                    {% if vt_rate > most_dangerous_vt.rate %}
+                      {% set most_dangerous_vt.item = item %}
+                      {% set most_dangerous_vt.rate = vt_rate %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+                {% if most_dangerous_vt.item %}
+                  {% set rep = most_dangerous_vt.item.report %}
+                  {% set vt_display = rep.virustotal %}
+                  {% set vt_filename = most_dangerous_vt.item.filename %}
+                {% else %}
+                  {# VT 데이터가 없으면 첫 번째 파일 시도 #}
+                  {% set first_file = embedded_files[0] %}
+                  {% if first_file.report and first_file.report.virustotal %}
+                    {% set vt_display = first_file.report.virustotal %}
+                    {% set vt_filename = first_file.filename %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% else %}
+              {% set vt_display = virustotal %}
+            {% endif %}
+
+            {# 최종 보정: 선택 실패 시 상단에서 계산된 virustotal을 재사용 #}
+            {% if not vt_display and virustotal %}
+              {% set vt_display = virustotal %}
+            {% endif %}
+            
             {% if vt_display and vt_display.scan_summary %}
               {% set scan_summary = vt_display.scan_summary %}
               {% set malicious_count = scan_summary.malicious or 0 %}
@@ -744,11 +893,23 @@
                   <path d="M13 10l4 4M17 10l-4 4" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </div>
-              <h2 class="vt-empty-title">VirusTotal에 등록된 분석 정보가 없습니다</h2>
-              <p class="vt-empty-description">VirusTotal 커뮤니티에 등록된 분석 기록이 없어, 아직까지 알려진 위협은 발견되지 않았습니다.</p>
+              <h2 class="vt-empty-title">
+                {% if is_archive and embedded_files and embedded_files|length > 0 %}
+                  압축 파일 내부 파일들의 VirusTotal 분석 정보가 없습니다
+                {% else %}
+                  VirusTotal에 등록된 분석 정보가 없습니다
+                {% endif %}
+              </h2>
+              <p class="vt-empty-description">
+                {% if is_archive and embedded_files and embedded_files|length > 0 %}
+                  압축 파일 내부 파일들이 VirusTotal 커뮤니티에 등록되지 않아, 아직까지 알려진 위협은 발견되지 않았습니다.
+                {% else %}
+                  VirusTotal 커뮤니티에 등록된 분석 기록이 없어, 아직까지 알려진 위협은 발견되지 않았습니다.
+                {% endif %}
+              </p>
             {% endif %}
             
-            {% if vt_display and vt_display.available %}
+            {% if vt_display and (vt_display.available or vt_display.scan_summary) %}
             <!-- VirusTotal 데이터가 있는 경우에만 표시되는 기존 UI -->
             <!-- 위험도 요약 카드 -->
             <div class="vt-risk-card severity-{{ severity_class }}">
@@ -921,6 +1082,7 @@
               </div>
             </div>
             {% endif %}
+            
           </div>
         </div>
       </div>
@@ -1064,12 +1226,6 @@
       const progressElements = document.querySelectorAll('.circular-progress');
       
       progressElements.forEach(function(element) {
-        // is-normal 클래스가 있으면 JavaScript 처리 건너뛰기
-        if (element.classList.contains('is-normal')) {
-          console.log('⏭️ Skipping Normal circle - using inline styles');
-          return;
-        }
-        
         const percentage = parseFloat(element.getAttribute('data-percentage')) || 0;
         const fillElement = element.querySelector('.progress-ring-fill');
         
@@ -1080,16 +1236,26 @@
           const radius = svgWidth === '180' ? 75 : (svgWidth === '140' ? 60 : 50); // Normal: 75, Malicious: 60, 기타: 50
           const circumference = 2 * Math.PI * radius;
           
-          // Malicious 상태일 때만 애니메이션 적용
-          fillElement.style.strokeDasharray = circumference + ' ' + circumference;
-          fillElement.style.strokeDashoffset = circumference;
+          // Normal 상태인지 확인 (data-percentage가 0이거나 Normal 텍스트가 있는 경우)
+          const isNormalState = percentage === 0 || element.querySelector('.normal-status');
           
-          // 애니메이션 효과로 실제 퍼센트까지 진행
-          setTimeout(function() {
-            const offset = circumference - (percentage / 100) * circumference;
-            fillElement.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
-            fillElement.style.strokeDashoffset = offset;
-          }, 200);
+          if (isNormalState) {
+            // Normal 상태일 때는 애니메이션 없이 항상 100% 채워진 상태로 고정
+            fillElement.style.strokeDasharray = circumference + ' ' + circumference;
+            fillElement.style.strokeDashoffset = '0';
+            fillElement.style.transition = 'none'; // 애니메이션 비활성화
+          } else {
+            // Malicious 상태일 때만 애니메이션 적용
+            fillElement.style.strokeDasharray = circumference + ' ' + circumference;
+            fillElement.style.strokeDashoffset = circumference;
+            
+            // 애니메이션 효과로 실제 퍼센트까지 진행
+            setTimeout(function() {
+              const offset = circumference - (percentage / 100) * circumference;
+              fillElement.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
+              fillElement.style.strokeDashoffset = offset;
+            }, 200);
+          }
         }
       });
     }
@@ -1135,7 +1301,7 @@
       
       // 서버에서 전달된 VT JSON을 문자열로 주입 후 파싱 (에디터 린트 안전)
       try {
-        const __vt_json = `{{ (vt_display | default(none, true)) | tojson | safe }}`;
+        const __vt_json = `{{ (virustotal | default(none, true)) | tojson | safe }}`;
         console.log('[DEBUG/VT/tojson]', __vt_json);
         let __vt = null;
         try { __vt = __vt_json ? JSON.parse(__vt_json) : null; } catch(e) { console.warn('parse error', e); }
@@ -1493,4 +1659,3 @@
     });
   </script>
 </body>
-</html>
