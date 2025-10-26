@@ -1,5 +1,5 @@
 
-const CALLBACK_PREFIX = `${self.API_BASE || "http://localhost:8000"}/auth/google/callback`;
+const CALLBACK_PREFIX = `${self.API_BASE || "https://knowmal.duckdns.org"}/auth/google/callback`;
 
 const getExtId = () => chrome.runtime.id;
 const log = (...a) => console.log("[KnowMal][BG]", ...a);
@@ -44,7 +44,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === "KM_PING") return sendResponse({ ok: true, pong: Date.now() });
 
       if (msg.type === "KM_EXT_INFO")
-        return sendResponse({ ok: true, ext_id: getExtId(), api_base: self.API_BASE || "http://localhost:8000" });
+        return sendResponse({ ok: true, ext_id: getExtId(), api_base: self.API_BASE || "https://knowmal.duckdns.org" });
 
       if (msg.type === "KM_FETCH" || msg.type === "maloffice.fetch") {
         const r = await proxyFetch(msg.payload || msg);
@@ -57,7 +57,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           log("KM_DOWNLOAD_FILE request:", { message_id, filename, account_email });
           
           const extId = getExtId();
-          const downloadUrl = `${self.API_BASE || "http://localhost:8000"}/gmail/download/${encodeURIComponent(message_id)}?filename=${encodeURIComponent(filename)}`;
+          const downloadUrl = `${self.API_BASE || "https://knowmal.duckdns.org"}/gmail/download/${encodeURIComponent(message_id)}?filename=${encodeURIComponent(filename)}`;
           
           const headers = {
             "X-KM-Ext-Id": extId,

@@ -278,7 +278,7 @@ def scan(
 
         class MockRequest:
             def __init__(self):
-                self.base_url = "http://localhost:8000"
+                self.base_url = "https://knowmal.duckdns.org"
         
         share_result = create_share(
             request=MockRequest(),
@@ -298,7 +298,7 @@ def scan(
             pass
         
         if not report_url:
-            report_url = f"http://localhost:8000/r/gmail_{req.message_id}"
+            report_url = f"https://knowmal.duckdns.org/r/gmail_{req.message_id}"
 
     status = "unknown"
     try:

@@ -8,10 +8,8 @@
     "downloads"
   ],
   "host_permissions": [
-    "http://localhost:8000/*", 
-    "http://127.0.0.1:8000/*",
-    "http://13.125.46.188/*",
     "https://knowmal.duckdns.org/*",
+    "http://13.125.46.188/*",
     "https://*.tistory.com/*",
     "https://blog.kakaocdn.net/*",
     "https://mail.google.com/*"

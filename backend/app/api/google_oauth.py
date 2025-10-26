@@ -18,7 +18,7 @@ router = APIRouter(prefix="/auth/google", tags=["auth-google"])
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
-OAUTH_BASE = os.getenv("OAUTH_BASE", "http://localhost:8000").rstrip("/")
+OAUTH_BASE = os.getenv("OAUTH_BASE", "https://knowmal.duckdns.org").rstrip("/")
 CALLBACK_PATH = "/auth/google/callback"
 REDIRECT_URI = f"{OAUTH_BASE}{CALLBACK_PATH}"
 

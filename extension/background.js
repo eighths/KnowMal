@@ -1,7 +1,7 @@
-const API_BASE = "http://localhost:8000";  //개발용
+const API_BASE = "https://knowmal.duckdns.org";  //프로덕션용
 //const API_BASE = "https://knowmal.duckdns.org";  
 
-self.API_BASE = typeof API_BASE !== "undefined" ? API_BASE : self.API_BASE || "http://localhost:8000";
+self.API_BASE = typeof API_BASE !== "undefined" ? API_BASE : self.API_BASE || "https://knowmal.duckdns.org";
 
 let isContextValid = true;
 

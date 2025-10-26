@@ -2,7 +2,7 @@
   console.log("[KnowMal] content.js loaded on:", window.location.href);
   
   // const API_BASE = "https://knowmal.duckdns.org";
-  const API_BASE = "http://localhost:8000"; //개발용
+  const API_BASE = "https://knowmal.duckdns.org"; //프로덕션용
   const OFFICE_RE = /\.(docx?|xlsx?|pptx?)$/i;
   const EXTRA_FILE_RE = /\.(zip|7z|rar|alz|egg|tar|gz|bz2|xz|pdf|hwp|hwpx|txt|rtf|json|ps1|js|vbs|wsf|jar|apk|ipa|exe|dll|msi|bat|cmd|lnk|scr|iso|img|bin)$/i;
 

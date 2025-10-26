@@ -22,12 +22,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/maloffice"
     EXCERPT_LIMIT: int = 4000
 
-    ALLOWED_ORIGINS: str = "http://localhost"
+    ALLOWED_ORIGINS: str = "https://knowmal.duckdns.org"
 
     # Redis/Share
     REDIS_URL: str = "redis://localhost:6379/0"
     SHARE_TTL_SECONDS: int = 86400
-    BASE_URL: str = "http://localhost:8000"
+    BASE_URL: str = "https://knowmal.duckdns.org"
 
     # VirusTotal API
     VT_API_KEY: str = ""

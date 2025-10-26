@@ -1,5 +1,5 @@
 (() => {
-  const API_BASE = "http://localhost:8000";
+  const API_BASE = "https://knowmal.duckdns.org";
   const OFFICE_RE = /\.(docx?|xlsx?|pptx?|html?|json|zip|rar|7z|tar|gz|bz2|pdf|hwp|exe|dll|msi|bat|cmd|lnk|scr|iso|img|bin)$/i;
   const STYLE_ID = "maloffice-style-v2";
 
