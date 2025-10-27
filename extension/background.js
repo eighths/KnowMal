@@ -1,5 +1,4 @@
-const API_BASE = "https://knowmal.duckdns.org";  //프로덕션용
-//const API_BASE = "https://knowmal.duckdns.org";  
+const API_BASE = "https://knowmal.duckdns.org"; 
 
 self.API_BASE = typeof API_BASE !== "undefined" ? API_BASE : self.API_BASE || "https://knowmal.duckdns.org";
 
@@ -51,12 +50,13 @@ async function fetchJSON(url, opts = {}, timeoutMs = 20000) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  // 동기 응답 처리
   if (msg?.type === "KM_PING") {
     sendResponse({ ok: true, pong: Date.now() });
+    return true;
   }
-});
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  // 비동기 응답이 필요한 경우
   if (!isContextValid) {
     sendResponse({ 
       ok: false, 
@@ -259,7 +259,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   });
 })();
 
-// Gmail OAuth 확장 메시지 핸들러
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     try {
@@ -536,8 +535,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             const errorText = await r.text().catch(() => "");
             throw new Error(`Download failed: ${r.status} ${errorText}`);
           }
-          
-          // 파일을 Blob으로 받아서 다운로드 URL 생성
+
           const blob = await r.blob();
           const url = URL.createObjectURL(blob);
           
