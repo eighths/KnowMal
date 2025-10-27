@@ -112,7 +112,7 @@ def is_archive_file(file_bytes: bytes, filename: str = "") -> bool:
     return False
 
 
-def extract_archive_files(file_bytes: bytes, filename: str = "", password: str = "pass") -> List[Dict[str, Any]]:
+def extract_archive_files(file_bytes: bytes, filename: str = "", password: str = "pass", original_filename: str = None) -> List[Dict[str, Any]]:
     extracted_files = []
     
     print(f"[DEBUG] extract_archive_files 시작 - 파일: {filename}, 크기: {len(file_bytes)} bytes")
@@ -160,7 +160,8 @@ def extract_archive_files(file_bytes: bytes, filename: str = "", password: str =
                                 file_bytes=file_data,
                                 filename=file_info.filename,
                                 use_cache=False,  
-                                include_virustotal=True
+                                include_virustotal=True,
+                                original_filename=original_filename
                             )
                             print(f"[DEBUG] 내부 파일 분석 완료: {file_info.filename}")
                             
@@ -422,7 +423,7 @@ def get_cached_report(sha256: str) -> Optional[Dict[str, Any]]:
     cached = r.get(file_metadata_key(sha256))
     return json.loads(cached) if cached else None
 
-def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: int = 3600, use_cache: bool = True, include_virustotal: bool = True) -> dict:
+def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: int = 3600, use_cache: bool = True, include_virustotal: bool = True, original_filename: str = None) -> dict:
     print(f"[DEBUG] analyze_bytes 함수 진입 - 파일: {filename}")
     sha256 = _sha256_of_bytes(file_bytes)
     r = get_redis()
@@ -438,17 +439,20 @@ def analyze_bytes(file_bytes: bytes, filename: str = "upload.bin", *, ttl_sec: i
     
     if is_archive_file(file_bytes, filename):
         print(f"[DEBUG] 압축 파일 감지됨: {filename}, 크기: {len(file_bytes)} bytes")
-        extracted_files = extract_archive_files(file_bytes, filename)
+        extracted_files = extract_archive_files(file_bytes, filename, original_filename=original_filename)
         print(f"[DEBUG] 추출된 파일 수: {len(extracted_files)}")
+        
+        # 원본 파일명 사용 (압축 파일명)
+        archive_filename = original_filename if original_filename else filename
         
         report = {
             "schema_version": "1.0",
-            "report_id": filename,
+            "report_id": archive_filename,
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "analyzer": {"name": "ArchiveAnalyzer"},
             "file": {
-                "filename": filename,
-                "extension": Path(filename).suffix.lower(),
+                "filename": archive_filename,
+                "extension": Path(archive_filename).suffix.lower(),
                 "size_bytes": len(file_bytes),
                 "mime_type": mime,
                 "hash": {"sha256": sha256},

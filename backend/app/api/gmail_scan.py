@@ -230,7 +230,8 @@ def scan(
             filename=fname,
             ttl_sec=86400, 
             use_cache=False,
-            include_virustotal=True
+            include_virustotal=True,
+            original_filename=fname
         )
 
         try:
