@@ -130,7 +130,8 @@ def create_share(
             first_item = (analysis_report.get("embedded_files") or [])[:1]
             if first_item:
                 first = first_item[0]
-                payload["filename"] = first.get("filename") or payload.get("filename")
+                if not analysis_report.get("file", {}).get("is_archive"):
+                    payload["filename"] = first.get("filename") or payload.get("filename")
                 payload["size_bytes"] = first.get("size_bytes") or payload.get("size_bytes")
                 payload["sha256"] = first.get("sha256") or payload.get("sha256")
     except Exception:

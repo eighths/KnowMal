@@ -64,7 +64,8 @@ async def upload(file: UploadFile, background_tasks: BackgroundTasks, db: Sessio
             filename=filename, 
             ttl_sec=settings.SHARE_TTL_SECONDS, 
             use_cache=True,
-            include_virustotal=True
+            include_virustotal=True,
+            original_filename=filename
         )
         print(f"[DEBUG] analyze_bytes 호출 완료 - report 타입: {type(report)}")
         

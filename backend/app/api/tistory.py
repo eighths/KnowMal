@@ -216,7 +216,8 @@ def fetch_url(req: FetchReq, db: Session = Depends(get_db), settings=Depends(get
             raw_for_excerpt, 
             filename, 
             ttl_sec=getattr(settings, "SHARE_TTL_SECONDS", 3600), 
-            use_cache=False 
+            use_cache=False,
+            original_filename=filename
         )
         logger.info(f"정적 분석 완료: {filename}")
         
