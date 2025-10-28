@@ -25,34 +25,6 @@ KnowMal은 다음과 같은 핵심 기능을 제공합니다:
 
 ![기술 스택](docs/images/tech-stack.png)
 
-### Backend
-- **Framework**: FastAPI
-- **Database**: PostgreSQL 16
-- **Cache**: Redis 7
-- **AI/ML**: 
-  - scikit-learn 1.7.2
-  - XGBoost 3.0.5
-  - SHAP (설명 가능한 AI)
-  - Google Gemini API
-- **파일 분석**: 
-  - oletools (Office 문서 분석)
-  - python-magic (파일 타입 감지)
-  - pefile (실행 파일 분석)
-- **기타**: 
-  - SQLAlchemy (ORM)
-  - Pydantic (데이터 검증)
-  - Google OAuth 2.0
-
-### Frontend
-- **브라우저 확장**: Chrome Extension (Manifest V3)
-- **템플릿**: Jinja2 + HTML/CSS
-- **API 통신**: JavaScript Fetch API
-
-### Infrastructure
-- **컨테이너**: Docker + Docker Compose
-- **외부 API**: VirusTotal API, Google Gemini API
-- **배포**: Linux 서버 환경
-
 ---
 
 ## 서비스 구성도
